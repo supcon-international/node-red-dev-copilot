@@ -1,7 +1,7 @@
 <!-- Dev Copilot 节点配置面板 -->
 <script type="text/javascript">
   RED.nodes.registerType("dev-copilot", {
-    category: "ai",
+    category: "AI dev copilot",
     color: "#87CEEB",
     defaults: {
       name: { value: "" },
@@ -10,7 +10,7 @@
       mcpCommand: { value: "" },
       mcpArgs: { value: "" },
       mcpEnv: { value: "" },
-      systemPrompt: { value: "You are a helpful development assistant." },
+      systemPrompt: { value: "" },
     },
     credentials: {
       apiKey: { type: "password", required: true },
@@ -139,7 +139,7 @@
     <textarea
       id="node-input-systemPrompt"
       rows="4"
-      placeholder="You are a helpful development assistant."
+      placeholder="You are a helpful Node-RED development assistant."
     ></textarea>
   </div>
 </script>
@@ -233,7 +233,7 @@
           id: "dev-copilot-sidebar",
           label: "Dev Copilot",
           name: "Dev Copilot",
-          iconClass: "fa fa-robot",
+          iconClass: "fa fa-rocket",
           content: $('<div id="dev-copilot-content"></div>'),
           toolbar: $('<div id="dev-copilot-toolbar"></div>'),
           enableOnEdit: true,

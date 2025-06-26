@@ -24,8 +24,7 @@ module.exports = function (RED) {
     node.mcpCommand = config.mcpCommand || "";
     node.mcpArgs = config.mcpArgs || "";
     node.mcpEnv = config.mcpEnv || "";
-    node.systemPrompt =
-      config.systemPrompt || "You are a helpful development assistant.";
+    node.systemPrompt = config.systemPrompt || "";
 
     // Get sensitive information (credentials)
     node.apiKey = node.credentials.apiKey || "";
@@ -84,15 +83,7 @@ module.exports = function (RED) {
     node.mcpClient = new MCPClientHelper();
 
     // System prompt (default)
-    node.defaultSystemPrompt = `You are a development assistant integrated into Node-RED. 
-You can help with:
-- Node-RED flow development
-- JavaScript/Node.js code analysis
-- Debugging assistance
-- Best practices recommendations
-- Documentation generation
-
-Please provide clear, actionable advice and code examples when appropriate.`;
+    node.defaultSystemPrompt = `You are a node-red dev copilot integrated into Node-RED. Developed by SUPCON-INTERNATIONAL`;
 
     // Initialize MCP connection - simplified configuration
     node.initMCP = async function () {
