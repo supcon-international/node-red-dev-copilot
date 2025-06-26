@@ -91,3 +91,6 @@ tests/
 
 # Personal
 TODO.md
+
+# package-lock.json
+package-lock.json
