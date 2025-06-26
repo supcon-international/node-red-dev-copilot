@@ -1,0 +1,700 @@
+<!-- Dev Copilot 节点配置面板 -->
+<script type="text/javascript">
+  RED.nodes.registerType("dev-copilot", {
+    category: "ai",
+    color: "#87CEEB",
+    defaults: {
+      name: { value: "" },
+      provider: { value: "openai", required: true },
+      model: { value: "gpt-4", required: true },
+      mcpCommand: { value: "" },
+      mcpArgs: { value: "" },
+      mcpEnv: { value: "" },
+      systemPrompt: { value: "You are a helpful development assistant." },
+      azureEndpoint: { value: "" },
+      azureApiVersion: { value: "2024-02-15-preview" },
+    },
+    credentials: {
+      apiKey: { type: "password", required: true },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "font-awesome/fa-robot",
+    label: function () {
+      return this.name || `${this.provider} ${this.model}`;
+    },
+    labelStyle: function () {
+      return this.name ? "node_label_italic" : "";
+    },
+    paletteLabel: "dev copilot",
+    oneditprepare: function () {
+      const providerModels = {
+        openai: [
+          "gpt-4",
+          "gpt-4-turbo",
+          "gpt-3.5-turbo",
+          "gpt-4o",
+          "gpt-4o-mini",
+        ],
+        anthropic: [
+          "claude-3-5-sonnet-20241022",
+          "claude-3-opus-20240229",
+          "claude-3-sonnet-20240229",
+          "claude-3-haiku-20240307",
+        ],
+        google: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"],
+        azure: ["gpt-4", "gpt-4-turbo", "gpt-35-turbo", "gpt-4o"],
+      };
+
+      function updateModelOptions() {
+        const provider = $("#node-input-provider").val();
+        const modelSelect = $("#node-input-model");
+        const currentModel = modelSelect.val();
+
+        modelSelect.empty();
+
+        if (providerModels[provider]) {
+          providerModels[provider].forEach((model) => {
+            modelSelect.append($("<option></option>").val(model).text(model));
+          });
+
+          // 如果当前模型在新列表中，保持选择
+          if (providerModels[provider].includes(currentModel)) {
+            modelSelect.val(currentModel);
+          }
+        }
+      }
+
+      function toggleAzureConfig() {
+        const provider = $("#node-input-provider").val();
+        if (provider === "azure") {
+          $(".azure-config").show();
+        } else {
+          $(".azure-config").hide();
+        }
+      }
+
+      // 提供商改变时更新模型选项和Azure配置显示
+      $("#node-input-provider").on("change", function () {
+        updateModelOptions();
+        toggleAzureConfig();
+      });
+
+      // 初始化
+      updateModelOptions();
+      toggleAzureConfig();
+    },
+  });
+</script>
+
+<!-- 节点编辑面板模板 -->
+<script type="text/html" data-template-name="dev-copilot">
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="Name" />
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-provider"
+      ><i class="fa fa-cloud"></i> Provider</label
+    >
+    <select id="node-input-provider">
+      <option value="openai">OpenAI</option>
+      <option value="anthropic">Anthropic</option>
+      <option value="google">Google</option>
+      <option value="azure">Azure OpenAI</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-model"><i class="fa fa-cog"></i> Model</label>
+    <select id="node-input-model">
+      <option value="gpt-4">gpt-4</option>
+    </select>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-apiKey"><i class="fa fa-key"></i> API Key</label>
+    <input type="password" id="node-input-apiKey" data-nr-credentials="true" />
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-mcpCommand"
+      ><i class="fa fa-terminal"></i> MCP Command</label
+    >
+    <input
+      type="text"
+      id="node-input-mcpCommand"
+      placeholder="例如: npx @modelcontextprotocol/server-everything 或 python server.py"
+    />
+    <div class="form-tips">MCP 服务器启动命令（留空表示不使用 MCP）</div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-mcpArgs"><i class="fa fa-list"></i> Arguments</label>
+    <input
+      type="text"
+      id="node-input-mcpArgs"
+      placeholder="例如: --port 3000 --verbose"
+    />
+    <div class="form-tips">可选：命令行参数，用空格分隔</div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-mcpEnv"
+      ><i class="fa fa-gear"></i> Environment Variables</label
+    >
+    <input
+      type="text"
+      id="node-input-mcpEnv"
+      placeholder="例如: API_KEY=xxx,DEBUG=true"
+    />
+    <div class="form-tips">
+      可选：环境变量，格式为 KEY=value，多个用逗号分隔
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-systemPrompt"
+      ><i class="fa fa-comment"></i> System Prompt</label
+    >
+    <textarea
+      id="node-input-systemPrompt"
+      rows="4"
+      placeholder="You are a helpful development assistant."
+    ></textarea>
+  </div>
+
+  <!-- Azure OpenAI 特定配置 -->
+  <div class="form-row azure-config" style="display:none;">
+    <label for="node-input-azureEndpoint"
+      ><i class="fa fa-globe"></i> Azure Endpoint</label
+    >
+    <input
+      type="text"
+      id="node-input-azureEndpoint"
+      placeholder="https://your-resource.openai.azure.com"
+    />
+  </div>
+
+  <div class="form-row azure-config" style="display:none;">
+    <label for="node-input-azureApiVersion"
+      ><i class="fa fa-code"></i> API Version</label
+    >
+    <select id="node-input-azureApiVersion">
+      <option value="2024-02-15-preview">2024-02-15-preview</option>
+      <option value="2023-12-01-preview">2023-12-01-preview</option>
+      <option value="2023-05-15">2023-05-15</option>
+    </select>
+  </div>
+</script>
+
+<!-- 节点帮助文档 -->
+<script type="text/html" data-help-name="dev-copilot">
+  <p>AI Development Copilot node with MCP (Model Context Protocol) support.</p>
+
+  <h3>Configuration</h3>
+  <dl class="message-properties">
+    <dt>Provider <span class="property-type">string</span></dt>
+    <dd>The AI provider to use (OpenAI, Anthropic, Google, Azure)</dd>
+
+    <dt>Model <span class="property-type">string</span></dt>
+    <dd>The specific model to use (e.g., gpt-4, claude-3-sonnet)</dd>
+
+    <dt>API Key <span class="property-type">credentials</span></dt>
+    <dd>API key for the selected provider</dd>
+
+    <dt>MCP Server Path <span class="property-type">string</span></dt>
+    <dd>Path to the MCP server executable (optional)</dd>
+
+    <dt>MCP Server Args <span class="property-type">string</span></dt>
+    <dd>Arguments to pass to the MCP server (optional)</dd>
+
+    <dt>System Prompt <span class="property-type">string</span></dt>
+    <dd>System prompt to use for AI interactions</dd>
+  </dl>
+
+  <h3>Input</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">string | object</span></dt>
+    <dd>The user message or query to send to the AI</dd>
+
+    <dt>history <span class="property-type">array</span></dt>
+    <dd>Optional conversation history array</dd>
+  </dl>
+
+  <h3>Output</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">string</span></dt>
+    <dd>The AI's response</dd>
+
+    <dt>llm_config <span class="property-type">object</span></dt>
+    <dd>Configuration used for this request</dd>
+
+    <dt>mcp_available <span class="property-type">boolean</span></dt>
+    <dd>Whether MCP tools are available</dd>
+
+    <dt>mcp_tools <span class="property-type">array</span></dt>
+    <dd>Available MCP tools (if MCP is connected)</dd>
+  </dl>
+
+  <h3>Details</h3>
+  <p>
+    This node provides AI assistance for development tasks. It can optionally
+    connect to MCP (Model Context Protocol) servers to extend functionality with
+    additional tools and resources.
+  </p>
+
+  <p>
+    The node also registers a sidebar interface for interactive chat
+    functionality.
+  </p>
+</script>
+
+<!-- 侧边栏注册脚本 -->
+<script type="text/javascript">
+  (function () {
+    let sidebarRegistered = false;
+
+    function registerDevCopilotSidebar() {
+      if (sidebarRegistered) {
+        console.log("Dev Copilot sidebar already registered");
+        return;
+      }
+
+      try {
+        // 检查 RED 对象是否可用
+        if (!RED || !RED.sidebar) {
+          console.log("RED.sidebar not available yet, will retry...");
+          setTimeout(registerDevCopilotSidebar, 500);
+          return;
+        }
+
+        // 注册侧边栏标签
+        RED.sidebar.addTab({
+          id: "dev-copilot-sidebar",
+          label: "Dev Copilot",
+          name: "Dev Copilot",
+          iconClass: "fa fa-robot",
+          content: $('<div id="dev-copilot-content"></div>'),
+          toolbar: $('<div id="dev-copilot-toolbar"></div>'),
+          enableOnEdit: true,
+          onchange: function () {
+            loadSidebarContent();
+          },
+        });
+
+        sidebarRegistered = true;
+        console.log("Dev Copilot sidebar registered successfully");
+
+        // 立即加载内容
+        loadSidebarContent();
+      } catch (error) {
+        console.error("Failed to register Dev Copilot sidebar:", error);
+        // 如果失败，稍后重试
+        setTimeout(registerDevCopilotSidebar, 1000);
+      }
+    }
+
+    // 等待 DOM 和 RED 完全加载
+    $(document).ready(function () {
+      // 延迟注册以确保 RED 完全加载
+      setTimeout(registerDevCopilotSidebar, 100);
+    });
+
+    // 监听运行时事件作为备用
+    if (RED && RED.events) {
+      RED.events.on("runtime-event", function (event) {
+        if (
+          event.id === "runtime-state" &&
+          event.payload.state === "start" &&
+          !sidebarRegistered
+        ) {
+          registerDevCopilotSidebar();
+        }
+      });
+    }
+
+    function loadSidebarContent() {
+      const content = $("#dev-copilot-content");
+      if (content.length === 0) {
+        console.log("Dev Copilot content div not found, will retry...");
+        setTimeout(loadSidebarContent, 500);
+        return;
+      }
+
+      console.log("Loading Dev Copilot sidebar content...");
+
+      // 加载侧边栏内容
+      $.get("/dev-copilot/sidebar")
+        .done(function (data) {
+          console.log("Dev Copilot sidebar content loaded successfully");
+          content.html(data);
+          initializeSidebarFunctionality();
+        })
+        .fail(function (xhr, status, error) {
+          console.error("Failed to load Dev Copilot sidebar:", {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            error: error,
+          });
+
+          let errorMsg = "Failed to load Dev Copilot sidebar";
+          if (xhr.status) {
+            errorMsg += " (HTTP " + xhr.status + ")";
+          }
+          if (error) {
+            errorMsg += ": " + error;
+          }
+
+          content.html(
+            '<div class="red-ui-info-outline"><p>' +
+              errorMsg +
+              "</p><p>Check browser console for more details.</p></div>"
+          );
+        });
+    }
+
+    function initializeSidebarFunctionality() {
+      // 初始化侧边栏功能
+      const messageContainer = $("#dev-copilot-messages");
+      const messageInput = $("#dev-copilot-input");
+      const sendButton = $("#dev-copilot-send");
+      const configButton = $("#dev-copilot-config");
+      const nodeSelect = $("#dev-copilot-node-select");
+
+      // 消息历史
+      let messageHistory = [];
+      let currentNodeId = null;
+
+      // 加载可用节点
+      loadAvailableNodes();
+
+      // 发送消息
+      function sendMessage() {
+        const message = messageInput.val().trim();
+        if (!message) {
+          addMessageToUI("error", "请输入消息内容");
+          return;
+        }
+
+        // 检查是否选择了节点
+        if (!currentNodeId) {
+          addMessageToUI(
+            "error",
+            "请先选择一个Dev Copilot节点。如果没有可用节点，请先在画布中创建和配置节点。"
+          );
+          return;
+        }
+
+        // 添加用户消息到界面
+        addMessageToUI("user", message);
+        messageHistory.push({ role: "user", content: message });
+
+        // 清空输入框
+        messageInput.val("");
+
+        // 显示加载状态
+        addMessageToUI("assistant", "正在思考...", true);
+
+        // 发送请求
+        $.ajax({
+          url: "/dev-copilot/chat",
+          method: "POST",
+          contentType: "application/json",
+          data: JSON.stringify({
+            message: message,
+            nodeId: currentNodeId,
+            history: messageHistory.slice(-10), // 保留最近10条消息
+          }),
+          success: function (response) {
+            // 移除加载消息
+            $(".dev-copilot-loading").remove();
+
+            if (response.success) {
+              addMessageToUI("assistant", response.response);
+              messageHistory.push({
+                role: "assistant",
+                content: response.response,
+              });
+            } else {
+              addMessageToUI("error", "错误: " + response.error);
+            }
+          },
+          error: function (xhr) {
+            $(".dev-copilot-loading").remove();
+
+            let errorMsg = "网络错误";
+            try {
+              const errorResponse = JSON.parse(xhr.responseText);
+              errorMsg = errorResponse.error || errorMsg;
+            } catch (e) {
+              errorMsg = xhr.responseText || errorMsg;
+            }
+
+            addMessageToUI("error", errorMsg);
+          },
+        });
+      }
+
+      // 添加消息到UI
+      function addMessageToUI(type, content, isLoading = false) {
+        const messageDiv = $(
+          '<div class="dev-copilot-message dev-copilot-' + type + '"></div>'
+        );
+        if (isLoading) {
+          messageDiv.addClass("dev-copilot-loading");
+        }
+
+        // 根据消息类型设置样式和处理内容
+        if (type === "info") {
+          messageDiv.css({
+            "background-color": "#e3f2fd",
+            "border-left": "4px solid #2196f3",
+            padding: "12px",
+            margin: "8px 0",
+            "border-radius": "4px",
+            "white-space": "pre-line",
+            "font-size": "14px",
+            "line-height": "1.4",
+          });
+        } else if (type === "warning") {
+          messageDiv.css({
+            "background-color": "#fff3e0",
+            "border-left": "4px solid #ff9800",
+            padding: "12px",
+            margin: "8px 0",
+            "border-radius": "4px",
+            "white-space": "pre-line",
+            "font-size": "14px",
+            "line-height": "1.4",
+            color: "#e65100",
+          });
+        } else if (type === "error") {
+          messageDiv.css({
+            "background-color": "#ffebee",
+            "border-left": "4px solid #f44336",
+            padding: "12px",
+            margin: "8px 0",
+            "border-radius": "4px",
+            "white-space": "pre-line",
+            color: "#c62828",
+          });
+        } else if (type === "user") {
+          messageDiv.css({
+            "background-color": "#f0f0f0",
+            padding: "8px 12px",
+            margin: "4px 0",
+            "border-radius": "8px",
+            "text-align": "right",
+            "margin-left": "20%",
+          });
+        } else if (type === "assistant") {
+          messageDiv.css({
+            "background-color": "#e8f5e8",
+            padding: "8px 12px",
+            margin: "4px 0",
+            "border-radius": "8px",
+            "margin-right": "20%",
+            "white-space": "pre-line",
+          });
+        }
+
+        messageDiv.text(content);
+        messageContainer.append(messageDiv);
+        messageContainer.scrollTop(messageContainer[0].scrollHeight);
+      }
+
+      // 加载可用节点
+      function loadAvailableNodes() {
+        $.get("/dev-copilot/nodes", function (nodes) {
+          console.log("🔍 加载节点列表:", nodes);
+          nodeSelect.empty();
+
+          // 分离已部署和未部署的节点
+          const deployedNodes = nodes.filter(
+            (node) => node.status === "deployed"
+          );
+          const undeployedNodes = nodes.filter(
+            (node) => node.status === "not_deployed"
+          );
+
+          console.log(
+            `📊 节点状态统计: 总计 ${nodes.length}, 已部署 ${deployedNodes.length}, 未部署 ${undeployedNodes.length}`
+          );
+
+          if (deployedNodes.length === 0) {
+            if (nodes.length === 0) {
+              // 完全没有节点
+              nodeSelect.append(
+                '<option value="">没有可用的节点 - 请先创建和部署</option>'
+              );
+
+              addMessageToUI(
+                "info",
+                `
+🚀 欢迎使用 Dev Copilot！
+
+要开始使用，请按以下步骤操作：
+
+1️⃣ **创建节点**: 从左侧面板的 "ai" 分类中拖拽 "dev copilot" 节点到画布
+
+2️⃣ **配置节点**: 双击节点，配置以下信息：
+   • 选择 LLM 提供商 (OpenAI/Anthropic/Google/Azure)
+   • 输入对应的 API 密钥
+   • 选择要使用的模型
+   • (可选) 配置 MCP 服务器
+
+3️⃣ **部署**: 点击右上角红色的 "部署" 按钮
+
+4️⃣ **选择节点**: 在上方下拉框中选择已部署的节点
+
+然后就可以开始与 AI 助手对话了！ 🎉
+              `
+              );
+            } else {
+              // 有节点但都未部署
+              nodeSelect.append(
+                '<option value="">所有节点都未部署 - 请点击部署按钮</option>'
+              );
+
+              addMessageToUI(
+                "warning",
+                `
+⚠️ 发现 ${undeployedNodes.length} 个未部署的节点
+
+已创建的节点：
+${undeployedNodes
+  .map((n) => `• ${n.name} (${n.provider} ${n.model})`)
+  .join("\n")}
+
+🔧 要使用这些节点，请：
+1️⃣ 检查节点配置是否完整（双击节点查看）
+2️⃣ 点击右上角红色的 "部署" 按钮
+3️⃣ 等待部署完成后刷新页面
+4️⃣ 重新选择节点
+
+💡 如果部署失败，请检查控制台错误信息和API密钥配置。
+              `
+              );
+            }
+          } else {
+            // 有已部署的节点
+            nodeSelect.append(
+              '<option value="">请选择一个 Dev Copilot 节点...</option>'
+            );
+
+            // 添加已部署的节点
+            deployedNodes.forEach(function (node) {
+              const displayName = node.name || "未命名节点";
+              const option = $("<option></option>")
+                .val(node.id)
+                .text(`${displayName} (${node.provider} ${node.model})`);
+              nodeSelect.append(option);
+            });
+
+            // 如果有未部署的节点，显示分隔符和提醒
+            if (undeployedNodes.length > 0) {
+              nodeSelect.append(
+                `<option disabled>--- 未部署的节点 (${undeployedNodes.length}个) ---</option>`
+              );
+              undeployedNodes.forEach(function (node) {
+                const displayName = node.name || "未命名节点";
+                const option = $("<option></option>")
+                  .val("")
+                  .attr("disabled", true)
+                  .text(
+                    `❌ ${displayName} (${node.provider} ${node.model}) - 需要部署`
+                  );
+                nodeSelect.append(option);
+              });
+            }
+
+            // 自动选择逻辑
+            if (deployedNodes.length === 1) {
+              nodeSelect.val(deployedNodes[0].id);
+              currentNodeId = deployedNodes[0].id;
+
+              let warningMsg = "";
+              if (undeployedNodes.length > 0) {
+                warningMsg = `\n\n⚠️ 注意：还有 ${undeployedNodes.length} 个节点未部署。如需使用，请部署后刷新页面。`;
+              }
+
+              addMessageToUI(
+                "info",
+                `
+✅ 已自动选择节点: ${deployedNodes[0].name || "未命名节点"} (${
+                  deployedNodes[0].provider
+                } ${deployedNodes[0].model})
+
+现在可以开始对话了！你可以询问：
+• 📝 代码编写和优化建议
+• 🐛 调试和问题解决  
+• 📚 技术文档和最佳实践
+• 🔧 Node-RED 流程开发帮助
+
+${
+  deployedNodes[0].provider === "openai"
+    ? "💡 提示：你正在使用 OpenAI，支持强大的代码生成和分析能力！"
+    : ""
+}
+${
+  deployedNodes[0].provider === "anthropic"
+    ? "💡 提示：你正在使用 Anthropic Claude，擅长详细的分析和解释！"
+    : ""
+}${warningMsg}
+              `
+              );
+            } else if (deployedNodes.length > 1) {
+              addMessageToUI(
+                "info",
+                `
+📋 发现 ${deployedNodes.length} 个可用节点，请在上方下拉框中选择一个开始对话。
+
+${
+  undeployedNodes.length > 0
+    ? `⚠️ 另有 ${undeployedNodes.length} 个节点未部署，如需使用请先部署。`
+    : ""
+}
+              `
+              );
+            }
+          }
+        }).fail(function (xhr, status, error) {
+          console.error("❌ 加载节点失败:", { xhr, status, error });
+          nodeSelect.empty();
+          nodeSelect.append('<option value="">加载节点失败</option>');
+          addMessageToUI(
+            "error",
+            `无法加载可用节点，请检查 Node-RED 连接状态。
+          
+错误详情：${error || "Unknown error"}
+状态码：${xhr.status || "N/A"}`
+          );
+        });
+      }
+
+      // 事件监听
+      sendButton.on("click", sendMessage);
+      messageInput.on("keypress", function (e) {
+        if (e.which === 13 && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      nodeSelect.on("change", function () {
+        currentNodeId = $(this).val();
+        messageHistory = []; // 切换节点时清空历史
+        messageContainer.empty(); // 清空消息显示
+      });
+
+      configButton.on("click", function () {
+        RED.notify(
+          "Use the node configuration panel to modify settings",
+          "info"
+        );
+      });
+    }
+  })();
+</script>

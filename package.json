@@ -1,0 +1,34 @@
+{
+  "name": "node-red-sidebar-dev-copilot",
+  "version": "1.0.0",
+  "description": "A Node-RED sidebar plugin that provides AI development copilot functionality with MCP support",
+  "main": "nodes/dev-copilot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "node-red",
+    "sidebar",
+    "ai",
+    "copilot",
+    "mcp",
+    "development"
+  ],
+  "author": "SUPCON",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.1",
+    "axios": "^1.10.0",
+    "zod": "^3.22.0"
+  },
+  "node-red": {
+    "version": ">=3.0.0",
+    "nodes": {
+      "dev-copilot": "nodes/dev-copilot.js"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/supcon-international/node-red-sidebar-dev-copilot.git"
+  }
+}
