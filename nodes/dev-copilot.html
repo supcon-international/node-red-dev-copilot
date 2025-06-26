@@ -11,8 +11,6 @@
       mcpArgs: { value: "" },
       mcpEnv: { value: "" },
       systemPrompt: { value: "You are a helpful development assistant." },
-      azureEndpoint: { value: "" },
-      azureApiVersion: { value: "2024-02-15-preview" },
     },
     credentials: {
       apiKey: { type: "password", required: true },
@@ -28,61 +26,30 @@
     },
     paletteLabel: "dev copilot",
     oneditprepare: function () {
-      const providerModels = {
-        openai: [
-          "gpt-4",
-          "gpt-4-turbo",
-          "gpt-3.5-turbo",
-          "gpt-4o",
-          "gpt-4o-mini",
-        ],
-        anthropic: [
-          "claude-3-5-sonnet-20241022",
-          "claude-3-opus-20240229",
-          "claude-3-sonnet-20240229",
-          "claude-3-haiku-20240307",
-        ],
-        google: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"],
-        azure: ["gpt-4", "gpt-4-turbo", "gpt-35-turbo", "gpt-4o"],
+      const providerPlaceholders = {
+        openai: "例如: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o, gpt-4o-mini",
+        anthropic:
+          "例如: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307",
+        google: "例如: gemini-1.5-pro, gemini-1.5-flash, gemini-pro",
+        deepseek: "例如: deepseek-chat, deepseek-reasoner",
       };
 
-      function updateModelOptions() {
+      function updateModelPlaceholder() {
         const provider = $("#node-input-provider").val();
-        const modelSelect = $("#node-input-model");
-        const currentModel = modelSelect.val();
+        const modelInput = $("#node-input-model");
 
-        modelSelect.empty();
-
-        if (providerModels[provider]) {
-          providerModels[provider].forEach((model) => {
-            modelSelect.append($("<option></option>").val(model).text(model));
-          });
-
-          // 如果当前模型在新列表中，保持选择
-          if (providerModels[provider].includes(currentModel)) {
-            modelSelect.val(currentModel);
-          }
+        if (providerPlaceholders[provider]) {
+          modelInput.attr("placeholder", providerPlaceholders[provider]);
         }
       }
 
-      function toggleAzureConfig() {
-        const provider = $("#node-input-provider").val();
-        if (provider === "azure") {
-          $(".azure-config").show();
-        } else {
-          $(".azure-config").hide();
-        }
-      }
-
-      // 提供商改变时更新模型选项和Azure配置显示
+      // 提供商改变时更新模型placeholder
       $("#node-input-provider").on("change", function () {
-        updateModelOptions();
-        toggleAzureConfig();
+        updateModelPlaceholder();
       });
 
       // 初始化
-      updateModelOptions();
-      toggleAzureConfig();
+      updateModelPlaceholder();
     },
   });
 </script>
@@ -102,15 +69,20 @@
       <option value="openai">OpenAI</option>
       <option value="anthropic">Anthropic</option>
       <option value="google">Google</option>
-      <option value="azure">Azure OpenAI</option>
+      <option value="deepseek">DeepSeek</option>
     </select>
   </div>
 
   <div class="form-row">
     <label for="node-input-model"><i class="fa fa-cog"></i> Model</label>
-    <select id="node-input-model">
-      <option value="gpt-4">gpt-4</option>
-    </select>
+    <input
+      type="text"
+      id="node-input-model"
+      placeholder="例如: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o, gpt-4o-mini"
+    />
+    <div class="form-tips">
+      输入您要使用的模型名称，会根据Provider显示推荐模型
+    </div>
   </div>
 
   <div class="form-row">
@@ -164,29 +136,6 @@
       placeholder="You are a helpful development assistant."
     ></textarea>
   </div>
-
-  <!-- Azure OpenAI 特定配置 -->
-  <div class="form-row azure-config" style="display:none;">
-    <label for="node-input-azureEndpoint"
-      ><i class="fa fa-globe"></i> Azure Endpoint</label
-    >
-    <input
-      type="text"
-      id="node-input-azureEndpoint"
-      placeholder="https://your-resource.openai.azure.com"
-    />
-  </div>
-
-  <div class="form-row azure-config" style="display:none;">
-    <label for="node-input-azureApiVersion"
-      ><i class="fa fa-code"></i> API Version</label
-    >
-    <select id="node-input-azureApiVersion">
-      <option value="2024-02-15-preview">2024-02-15-preview</option>
-      <option value="2023-12-01-preview">2023-12-01-preview</option>
-      <option value="2023-05-15">2023-05-15</option>
-    </select>
-  </div>
 </script>
 
 <!-- 节点帮助文档 -->
@@ -196,10 +145,13 @@
   <h3>Configuration</h3>
   <dl class="message-properties">
     <dt>Provider <span class="property-type">string</span></dt>
-    <dd>The AI provider to use (OpenAI, Anthropic, Google, Azure)</dd>
+    <dd>The AI provider to use (OpenAI, Anthropic, Google, DeepSeek)</dd>
 
     <dt>Model <span class="property-type">string</span></dt>
-    <dd>The specific model to use (e.g., gpt-4, claude-3-sonnet)</dd>
+    <dd>
+      The specific model to use (e.g., gpt-4, claude-3-5-sonnet-20241022,
+      gemini-1.5-pro)
+    </dd>
 
     <dt>API Key <span class="property-type">credentials</span></dt>
     <dd>API key for the selected provider</dd>
@@ -540,7 +492,7 @@
 1️⃣ **创建节点**: 从左侧面板的 "ai" 分类中拖拽 "dev copilot" 节点到画布
 
 2️⃣ **配置节点**: 双击节点，配置以下信息：
-   • 选择 LLM 提供商 (OpenAI/Anthropic/Google/Azure)
+   • 选择 LLM 提供商 (OpenAI/Anthropic/Google)
    • 输入对应的 API 密钥
    • 选择要使用的模型
    • (可选) 配置 MCP 服务器

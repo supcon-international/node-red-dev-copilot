@@ -6,7 +6,7 @@
 
 Node-RED Dev Copilot 现在支持：
 
-- ✅ **真实 LLM API 调用**：OpenAI、Anthropic、Google、Azure
+- ✅ **真实 LLM API 调用**：OpenAI、Anthropic、Google、DeepSeek
 - ✅ **MCP 工具集成**：自动发现和使用 MCP 服务器提供的工具
 - ✅ **智能工具调用**：LLM 根据需求自动选择和执行工具
 - ✅ **多轮对话**：支持基于工具结果的连续对话
@@ -27,7 +27,7 @@ node-red
 
 1. 从节点面板的 "ai" 分类中拖拽 "dev copilot" 节点到流程
 2. 双击节点配置：
-   - **Provider**: 选择 LLM 提供商（OpenAI/Anthropic/Google/Azure）
+   - **Provider**: 选择 LLM 提供商（OpenAI/Anthropic/Google/DeepSeek）
    - **Model**: 选择具体模型
    - **API Key**: 输入你的 API 密钥
    - **MCP Server Path**: 配置 MCP 服务器（可选）

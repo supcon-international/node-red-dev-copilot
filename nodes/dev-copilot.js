@@ -1,9 +1,3 @@
-const { spawn } = require("child_process");
-const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
-const {
-  StdioClientTransport,
-} = require("@modelcontextprotocol/sdk/client/stdio.js");
-const axios = require("axios");
 const path = require("path");
 const MCPClientHelper = require(path.join(
   __dirname,
@@ -11,6 +5,11 @@ const MCPClientHelper = require(path.join(
   "mcp",
   "mcp-client.js"
 ));
+
+// 导入官方SDK
+const OpenAI = require("openai");
+const Anthropic = require("@anthropic-ai/sdk");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 module.exports = function (RED) {
   "use strict";
@@ -28,12 +27,54 @@ module.exports = function (RED) {
     node.systemPrompt =
       config.systemPrompt || "You are a helpful development assistant.";
 
-    // Azure OpenAI 特定配置
-    node.azureEndpoint = config.azureEndpoint || "";
-    node.azureApiVersion = config.azureApiVersion || "2024-02-15-preview";
-
     // 获取敏感信息（credentials）
     node.apiKey = node.credentials.apiKey || "";
+
+    // 初始化LLM SDK客户端
+    node.initSDKClients = function () {
+      if (!node.apiKey) {
+        node.warn(`⚠️ 无法初始化 ${node.provider} SDK: API密钥为空`);
+        return;
+      }
+
+      try {
+        node.log(`🔧 初始化 ${node.provider} SDK客户端...`);
+
+        switch (node.provider.toLowerCase()) {
+          case "openai":
+            node.openaiClient = new OpenAI({
+              apiKey: node.apiKey,
+              timeout: 30000,
+            });
+            break;
+          case "deepseek":
+            node.openaiClient = new OpenAI({
+              apiKey: node.apiKey,
+              baseURL: "https://api.deepseek.com",
+              timeout: 30000,
+            });
+            break;
+          case "anthropic":
+            node.anthropicClient = new Anthropic({
+              apiKey: node.apiKey,
+              timeout: 30000,
+            });
+            break;
+          case "google":
+            node.googleClient = new GoogleGenerativeAI(node.apiKey);
+            break;
+          default:
+            throw new Error(`不支持的Provider: ${node.provider}`);
+        }
+
+        node.log(`✅ ${node.provider} SDK客户端初始化成功`);
+      } catch (error) {
+        node.error(`❌ ${node.provider} SDK客户端初始化失败: ${error.message}`);
+        node.error(
+          `调试信息: Provider=${node.provider}, 有API密钥=${!!node.apiKey}`
+        );
+      }
+    };
 
     // MCP 客户端实例 - 使用新的 MCPClientHelper
     node.mcpClient = new MCPClientHelper();
@@ -241,23 +282,29 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         // 获取可用的MCP工具
         const availableTools = await node.getMCPTools();
 
+        node.log(`🤖 调用 ${node.provider} API, 模型: ${node.model}`);
+
         switch (node.provider.toLowerCase()) {
           case "openai":
+          case "deepseek":
             return await node.callOpenAIWithTools(messages, availableTools);
           case "anthropic":
             return await node.callAnthropicWithTools(messages, availableTools);
           case "google":
             return await node.callGoogleWithTools(messages, availableTools);
-          case "azure":
-            return await node.callAzureOpenAIWithTools(
-              messages,
-              availableTools
-            );
+
           default:
             throw new Error(`不支持的LLM提供商: ${node.provider}`);
         }
       } catch (error) {
         node.error(`LLM API调用失败 (${node.provider}): ${error.message}`);
+
+        // 打印更详细的错误信息用于调试
+        if (error.response) {
+          node.error(`API响应状态: ${error.response.status}`);
+          node.error(`API响应数据: ${JSON.stringify(error.response.data)}`);
+        }
+
         // 如果API调用失败，返回错误信息而不是崩溃
         return {
           content: `❌ LLM API调用失败 (${node.provider}): ${error.message}\n\n请检查：\n1. API密钥是否正确\n2. 网络连接是否正常\n3. 模型名称是否有效\n4. API配额是否充足`,
@@ -266,15 +313,19 @@ Please provide clear, actionable advice and code examples when appropriate.`;
       }
     };
 
-    // OpenAI API 调用（带工具集成）
+    // OpenAI API 调用（带工具集成）- 使用官方SDK
     node.callOpenAIWithTools = async function (messages, tools) {
+      if (!node.openaiClient) {
+        throw new Error("OpenAI客户端未初始化");
+      }
+
       let conversationMessages = [...messages];
       let finalContent = [];
-      let lastResponse = null; // 保存最后一次API响应
+      let lastResponse = null;
 
       // 最多执行5轮工具调用，防止无限循环
       for (let round = 0; round < 5; round++) {
-        const requestBody = {
+        const requestParams = {
           model: node.model,
           messages: conversationMessages,
           temperature: 0.7,
@@ -283,24 +334,16 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
         // 如果有可用工具，添加到请求中
         if (tools && tools.length > 0) {
-          requestBody.tools = tools;
-          requestBody.tool_choice = "auto";
+          requestParams.tools = tools;
+          requestParams.tool_choice = "auto";
         }
 
-        const response = await axios.post(
-          "https://api.openai.com/v1/chat/completions",
-          requestBody,
-          {
-            headers: {
-              Authorization: `Bearer ${node.apiKey}`,
-              "Content-Type": "application/json",
-            },
-            timeout: 30000,
-          }
+        const response = await node.openaiClient.chat.completions.create(
+          requestParams
         );
+        lastResponse = response;
 
-        lastResponse = response; // 保存响应用于最终返回
-        const message = response.data.choices[0].message;
+        const message = response.choices[0].message;
         conversationMessages.push(message);
 
         // 检查是否有工具调用
@@ -315,18 +358,14 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
-
-              // 格式化工具结果
               const formattedResult = node.formatToolResult(toolResult);
 
-              // 添加工具调用结果到对话
               conversationMessages.push({
                 role: "tool",
                 tool_call_id: toolCall.id,
                 content: formattedResult,
               });
 
-              // 为显示目的截断结果
               const displayResult =
                 formattedResult.length > 500
                   ? formattedResult.substring(0, 500) + "...[已截断]"
@@ -344,10 +383,8 @@ Please provide clear, actionable advice and code examples when appropriate.`;
             }
           }
 
-          // 继续对话，让LLM处理工具结果
           continue;
         } else {
-          // 没有工具调用，返回最终响应
           finalContent.push(message.content);
           break;
         }
@@ -355,17 +392,48 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
       return {
         content: finalContent.join("\n\n"),
-        usage: lastResponse ? lastResponse.data.usage : null,
+        usage: lastResponse ? lastResponse.usage : null,
       };
     };
 
-    // Anthropic API 调用（带工具集成）
+    // Anthropic API 调用（带工具集成）- 使用官方SDK
     node.callAnthropicWithTools = async function (messages, tools) {
-      // 将OpenAI格式转换为Anthropic格式
+      if (!node.anthropicClient) {
+        throw new Error("Anthropic客户端未初始化");
+      }
+
       const systemMessage = messages.find((m) => m.role === "system");
       let conversationMessages = messages.filter((m) => m.role !== "system");
       let finalContent = [];
-      let lastResponse = null; // 保存最后一次API响应
+      let lastResponse = null;
+
+      // 如果没有工具，使用简单调用
+      if (!tools || tools.length === 0) {
+        node.log(`📤 Anthropic API 简单调用 - 无工具`);
+
+        const requestParams = {
+          model: node.model,
+          messages: conversationMessages,
+          max_tokens: 2000,
+        };
+
+        if (systemMessage && systemMessage.content) {
+          requestParams.system = systemMessage.content;
+        }
+
+        const response = await node.anthropicClient.messages.create(
+          requestParams
+        );
+        const textContent = response.content.filter(
+          (content) => content.type === "text"
+        );
+        const content = textContent.map((t) => t.text).join("\n");
+
+        return {
+          content: content,
+          usage: response.usage || null,
+        };
+      }
 
       // 转换工具格式为Anthropic格式
       const anthropicTools = tools.map((tool) => ({
@@ -374,35 +442,29 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         input_schema: tool.function.parameters,
       }));
 
+      node.log(
+        `📤 Anthropic API 请求 - 消息数: ${conversationMessages.length}, 工具数: ${anthropicTools.length}`
+      );
+
       // 最多执行5轮工具调用，防止无限循环
       for (let round = 0; round < 5; round++) {
-        const requestBody = {
+        const requestParams = {
           model: node.model,
-          system: systemMessage ? systemMessage.content : undefined,
           messages: conversationMessages,
           max_tokens: 2000,
+          tools: anthropicTools,
         };
 
-        // 如果有可用工具，添加到请求中
-        if (anthropicTools && anthropicTools.length > 0) {
-          requestBody.tools = anthropicTools;
+        if (systemMessage && systemMessage.content) {
+          requestParams.system = systemMessage.content;
         }
 
-        const response = await axios.post(
-          "https://api.anthropic.com/v1/messages",
-          requestBody,
-          {
-            headers: {
-              "x-api-key": node.apiKey,
-              "Content-Type": "application/json",
-              "anthropic-version": "2023-06-01",
-            },
-            timeout: 30000,
-          }
+        const response = await node.anthropicClient.messages.create(
+          requestParams
         );
+        lastResponse = response;
 
-        lastResponse = response; // 保存响应用于最终返回
-        const responseContent = response.data.content;
+        const responseContent = response.content;
 
         // 检查响应中是否有工具调用
         const toolUses = responseContent.filter(
@@ -480,207 +542,203 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
       return {
         content: finalContent.join("\n\n"),
-        usage: lastResponse ? lastResponse.data.usage : null,
+        usage: lastResponse ? lastResponse.usage : null,
       };
     };
 
-    // Google Gemini API 调用（带工具集成）
+    // Google Gemini API 调用（带工具集成）- 使用官方SDK
     node.callGoogleWithTools = async function (messages, tools) {
+      if (!node.googleClient) {
+        throw new Error("Google客户端未初始化");
+      }
+
       const systemInstruction = messages.find((m) => m.role === "system");
       let conversationMessages = messages.filter((m) => m.role !== "system");
       let finalContent = [];
-      let lastResponse = null; // 保存最后一次API响应
 
-      // 转换工具格式为Google格式
-      const googleTools =
-        tools.length > 0
-          ? [
-              {
-                function_declarations: tools.map((tool) => ({
-                  name: tool.function.name,
-                  description: tool.function.description,
-                  parameters: tool.function.parameters,
-                })),
-              },
-            ]
-          : [];
+      // 获取模型实例
+      const model = node.googleClient.getGenerativeModel({ model: node.model });
 
-      // 最多执行5轮工具调用，防止无限循环
-      for (let round = 0; round < 5; round++) {
-        // 将消息格式转换为Gemini格式
-        const contents = conversationMessages.map((msg) => ({
-          role: msg.role === "assistant" ? "model" : "user",
-          parts: [{ text: msg.content }],
-        }));
+      // 如果没有工具，使用简单调用
+      if (!tools || tools.length === 0) {
+        node.log(`📤 Google API 简单调用 - 无工具`);
 
-        const requestBody = {
-          contents: contents,
+        // 构建对话历史
+        const history = [];
+        for (let i = 0; i < conversationMessages.length - 1; i += 2) {
+          if (conversationMessages[i] && conversationMessages[i + 1]) {
+            history.push({
+              role: "user",
+              parts: [{ text: conversationMessages[i].content }],
+            });
+            history.push({
+              role: "model",
+              parts: [{ text: conversationMessages[i + 1].content }],
+            });
+          }
+        }
+
+        // 获取最后一条用户消息
+        const lastMessage =
+          conversationMessages[conversationMessages.length - 1];
+        if (!lastMessage || lastMessage.role !== "user") {
+          throw new Error("最后一条消息必须是用户消息");
+        }
+
+        const chat = model.startChat({
+          history: history,
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 2000,
           },
+          systemInstruction: systemInstruction
+            ? systemInstruction.content
+            : undefined,
+        });
+
+        const result = await chat.sendMessage(lastMessage.content);
+        const response = await result.response;
+
+        return {
+          content: response.text(),
+          usage: response.usageMetadata || null,
         };
+      }
 
-        if (systemInstruction) {
-          requestBody.systemInstruction = {
-            parts: [{ text: systemInstruction.content }],
-          };
-        }
+      // 实现Google SDK的工具调用功能
+      node.log(
+        `📤 Google API 请求 - 消息数: ${conversationMessages.length}, 工具数: ${tools.length}`
+      );
 
-        // 如果有可用工具，添加到请求中
-        if (googleTools.length > 0) {
-          requestBody.tools = googleTools;
-        }
+      // 清理JSON Schema以适配Google API
+      const cleanSchemaForGoogle = function (schema) {
+        if (!schema || typeof schema !== "object") return schema;
 
-        const response = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/${node.model}:generateContent?key=${node.apiKey}`,
-          requestBody,
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-            timeout: 30000,
+        const cleaned = JSON.parse(JSON.stringify(schema)); // 深拷贝
+
+        // 递归清理对象
+        function cleanObject(obj) {
+          if (typeof obj !== "object" || obj === null) return obj;
+
+          if (Array.isArray(obj)) {
+            return obj.map(cleanObject);
           }
-        );
 
-        lastResponse = response; // 保存响应用于最终返回
-        const candidate = response.data.candidates[0];
-        const parts = candidate.content.parts;
-
-        // 检查是否有函数调用
-        const functionCalls = parts.filter((part) => part.functionCall);
-        const textParts = parts.filter((part) => part.text);
-
-        // 添加文本内容
-        if (textParts.length > 0) {
-          finalContent.push(textParts.map((p) => p.text).join("\n"));
-        }
-
-        if (functionCalls.length > 0) {
-          // 添加模型响应到对话历史
-          conversationMessages.push({
-            role: "assistant",
-            content: parts
-              .map((p) => p.text || `[Function Call: ${p.functionCall?.name}]`)
-              .join("\n"),
+          // 移除Google API不支持的字段
+          const unsupportedFields = [
+            "$schema",
+            "additionalProperties",
+            "$ref",
+            "definitions",
+            "$id",
+            "$comment",
+          ];
+          unsupportedFields.forEach((field) => {
+            delete obj[field];
           });
 
-          // 执行函数调用
-          for (const functionCall of functionCalls) {
-            const toolName = functionCall.functionCall.name;
-            const toolArgs = functionCall.functionCall.args;
-
-            finalContent.push(`🔧 调用工具: ${toolName}`);
-            finalContent.push(`📝 参数: ${JSON.stringify(toolArgs, null, 2)}`);
-
-            try {
-              const toolResult = await node.executeMCPTool(toolName, toolArgs);
-
-              // 格式化工具结果
-              const formattedResult = node.formatToolResult(toolResult);
-
-              // 添加函数调用结果到对话（Google格式）
-              conversationMessages.push({
-                role: "user",
-                content: `Function ${toolName} result: ${formattedResult}`,
-              });
-
-              // 为显示目的截断结果
-              const displayResult =
-                formattedResult.length > 500
-                  ? formattedResult.substring(0, 500) + "...[已截断]"
-                  : formattedResult;
-
-              finalContent.push(`✅ 工具结果: ${displayResult}`);
-            } catch (error) {
-              conversationMessages.push({
-                role: "user",
-                content: `Function ${toolName} error: ${error.message}`,
-              });
-
-              finalContent.push(`❌ 工具调用失败: ${error.message}`);
-            }
+          // 递归处理所有属性
+          for (const key in obj) {
+            obj[key] = cleanObject(obj[key]);
           }
 
-          // 继续对话，让Gemini处理工具结果
-          continue;
-        } else {
-          // 没有工具调用，返回最终响应
-          break;
+          return obj;
         }
-      }
 
-      return {
-        content: finalContent.join("\n\n"),
-        usage: lastResponse ? lastResponse.data.usageMetadata : null,
+        return cleanObject(cleaned);
       };
-    };
 
-    // Azure OpenAI API 调用（带工具集成）
-    node.callAzureOpenAIWithTools = async function (messages, tools) {
-      // Azure OpenAI需要额外的配置信息
-      if (!node.azureEndpoint || !node.azureApiVersion) {
-        throw new Error("Azure OpenAI需要配置endpoint和API版本");
-      }
+      // 转换工具格式为Google格式
+      const googleTools = tools.map((tool) => ({
+        name: tool.function.name,
+        description: tool.function.description,
+        parameters: cleanSchemaForGoogle(tool.function.parameters),
+      }));
 
-      let conversationMessages = [...messages];
-      let finalContent = [];
-      let lastResponse = null; // 保存最后一次API响应
+      // 创建带工具的模型实例
+      const modelWithTools = node.googleClient.getGenerativeModel({
+        model: node.model,
+        tools: [{ functionDeclarations: googleTools }],
+        systemInstruction: systemInstruction
+          ? systemInstruction.content
+          : undefined,
+      });
 
-      // 最多执行5轮工具调用，防止无限循环
+      let lastResponse = null;
+
+      // 最多执行5轮工具调用
       for (let round = 0; round < 5; round++) {
-        const requestBody = {
-          messages: conversationMessages,
-          temperature: 0.7,
-          max_tokens: 2000,
-        };
-
-        // 如果有可用工具，添加到请求中
-        if (tools && tools.length > 0) {
-          requestBody.tools = tools;
-          requestBody.tool_choice = "auto";
+        // 构建当前对话历史
+        const history = [];
+        for (let i = 0; i < conversationMessages.length - 1; i += 2) {
+          if (conversationMessages[i] && conversationMessages[i + 1]) {
+            history.push({
+              role: "user",
+              parts: [{ text: conversationMessages[i].content }],
+            });
+            history.push({
+              role: "model",
+              parts: [{ text: conversationMessages[i + 1].content }],
+            });
+          }
         }
 
-        const response = await axios.post(
-          `${node.azureEndpoint}/openai/deployments/${node.model}/chat/completions?api-version=${node.azureApiVersion}`,
-          requestBody,
-          {
-            headers: {
-              "api-key": node.apiKey,
-              "Content-Type": "application/json",
-            },
-            timeout: 30000,
-          }
-        );
+        const lastMessage =
+          conversationMessages[conversationMessages.length - 1];
+        if (!lastMessage || lastMessage.role !== "user") {
+          throw new Error("最后一条消息必须是用户消息");
+        }
 
-        lastResponse = response; // 保存响应用于最终返回
-        const message = response.data.choices[0].message;
-        conversationMessages.push(message);
+        const chat = modelWithTools.startChat({
+          history: history,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2000,
+          },
+        });
 
-        // 检查是否有工具调用
-        if (message.tool_calls && message.tool_calls.length > 0) {
-          // 执行工具调用
-          for (const toolCall of message.tool_calls) {
-            const toolName = toolCall.function.name;
-            const toolArgs = JSON.parse(toolCall.function.arguments);
+        const result = await chat.sendMessage(lastMessage.content);
+        const response = await result.response;
+        lastResponse = response;
+
+        // 检查是否有函数调用
+        let functionCalls = [];
+        try {
+          functionCalls = response.functionCalls() || [];
+        } catch (error) {
+          // 如果没有function calls，会抛出错误，这是正常的
+          node.log("🔍 Google API: 没有检测到函数调用");
+          functionCalls = [];
+        }
+
+        if (functionCalls && functionCalls.length > 0) {
+          // 有工具调用
+          node.log(`🔧 Google API 检测到 ${functionCalls.length} 个工具调用`);
+
+          // 添加模型响应到对话历史
+          const responseText = response.text() || "[Function calls]";
+          conversationMessages.push({
+            role: "assistant",
+            content: responseText,
+          });
+
+          const functionResponses = [];
+
+          for (const functionCall of functionCalls) {
+            const toolName = functionCall.name;
+            const toolArgs = functionCall.args;
 
             finalContent.push(`🔧 调用工具: ${toolName}`);
             finalContent.push(`📝 参数: ${JSON.stringify(toolArgs, null, 2)}`);
 
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
-
-              // 格式化工具结果
               const formattedResult = node.formatToolResult(toolResult);
 
-              // 添加工具调用结果到对话
-              conversationMessages.push({
-                role: "tool",
-                tool_call_id: toolCall.id,
-                content: formattedResult,
-              });
+              functionResponses.push(
+                `Function ${toolName} result: ${formattedResult}`
+              );
 
-              // 为显示目的截断结果
               const displayResult =
                 formattedResult.length > 500
                   ? formattedResult.substring(0, 500) + "...[已截断]"
@@ -688,28 +746,31 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
               finalContent.push(`✅ 工具结果: ${displayResult}`);
             } catch (error) {
-              conversationMessages.push({
-                role: "tool",
-                tool_call_id: toolCall.id,
-                content: `Error: ${error.message}`,
-              });
-
+              functionResponses.push(
+                `Function ${toolName} error: ${error.message}`
+              );
               finalContent.push(`❌ 工具调用失败: ${error.message}`);
             }
           }
 
-          // 继续对话，让LLM处理工具结果
+          // 发送工具调用结果
+          const functionResponseMessage = functionResponses.join("\n\n");
+          conversationMessages.push({
+            role: "user",
+            content: functionResponseMessage,
+          });
+
           continue;
         } else {
           // 没有工具调用，返回最终响应
-          finalContent.push(message.content);
+          finalContent.push(response.text());
           break;
         }
       }
 
       return {
         content: finalContent.join("\n\n"),
-        usage: lastResponse ? lastResponse.data.usage : null,
+        usage: lastResponse ? lastResponse.usageMetadata || null : null,
       };
     };
 
@@ -791,6 +852,9 @@ Please provide clear, actionable advice and code examples when appropriate.`;
     node.on("close", async function () {
       await node.disconnectMCP();
     });
+
+    // 初始化SDK客户端
+    node.initSDKClients();
 
     // 初始化时尝试连接 MCP
     if (node.mcpCommand) {

@@ -6,7 +6,7 @@
 
 ## 功能特性
 
-- 🤖 **AI 开发助手**: 集成多种 LLM 提供商（OpenAI、Anthropic、Google、Azure）
+- 🤖 **AI 开发助手**: 集成多种 LLM 提供商（OpenAI、Anthropic、Google、DeepSeek）
 - 🔧 **MCP 协议支持**: 支持 Model Context Protocol，自动发现和调用 MCP 工具
 - 🎯 **智能工具调用**: LLM 根据需求自动选择和执行工具，获取实时数据
 - 📱 **侧边栏 UI**: 直接在 Node-RED 编辑器中进行 AI 对话
@@ -50,7 +50,7 @@ npm install
 
 #### LLM 提供商设置
 
-- **Provider**: 选择 AI 提供商（openai、anthropic、google、azure）
+- **Provider**: 选择 AI 提供商（openai、anthropic、google、deepseek）
 - **Model**: 指定模型名称（如：gpt-4、claude-3-sonnet、gemini-pro）
 - **API Key**: 输入对应提供商的 API 密钥（将安全存储）
 
@@ -68,6 +68,14 @@ npm install
 Provider: openai
 Model: gpt-4
 API Key: sk-...（你的OpenAI API密钥）
+```
+
+#### DeepSeek 配置
+
+```
+Provider: deepseek
+Model: deepseek-chat
+API Key: sk-...（你的DeepSeek API密钥）
 ```
 
 #### 使用 MCP 服务器
