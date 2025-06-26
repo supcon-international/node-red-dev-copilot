@@ -7,9 +7,11 @@
 Node-RED Dev Copilot 现在支持：
 
 - ✅ **真实 LLM API 调用**：OpenAI、Anthropic、Google、DeepSeek
+- ✅ **官方 SDK 集成**：使用官方 SDK 替代直接 HTTP 请求，提供更好的稳定性
 - ✅ **MCP 工具集成**：自动发现和使用 MCP 服务器提供的工具
 - ✅ **智能工具调用**：LLM 根据需求自动选择和执行工具
 - ✅ **多轮对话**：支持基于工具结果的连续对话
+- ✅ **英文界面**：完全英文化的用户界面，提供更好的国际化支持
 
 ## 🚀 演示步骤
 
@@ -36,6 +38,13 @@ node-red
 ### 3. 配置 MCP 服务器（可选）
 
 如果你有 MCP 服务器，可以配置：
+
+#### 示例：SUPCON Node-RED MCP 服务器（推荐）
+
+```bash
+# MCP Server Path: npx
+# MCP Server Args: @supcon-international/node-red-mcp-server
+```
 
 #### 示例：文件系统服务器
 
@@ -107,6 +116,14 @@ node tests/test-mcp-llm-integration.js
 
 ## 🔧 支持的 MCP 服务器
 
+### 推荐服务器
+
+1. **SUPCON Node-RED MCP 服务器**（推荐）
+
+   ```bash
+   npx @supcon-international/node-red-mcp-server
+   ```
+
 ### 官方服务器
 
 1. **文件系统服务器**
@@ -159,7 +176,20 @@ node tests/test-mcp-llm-integration.js
       建议优化：...
 ```
 
-### 场景 3: 天气查询助手
+### 场景 3: DeepSeek 推理助手
+
+使用 DeepSeek 模型进行复杂推理：
+
+```
+用户: 帮我分析这个Node-RED流程的性能瓶颈
+助手: [使用 DeepSeek 的强大推理能力]
+      根据流程分析，发现以下潜在瓶颈：
+      1. HTTP请求节点的并发限制
+      2. 数据库查询的索引优化
+      建议优化方案：...
+```
+
+### 场景 4: 天气查询助手
 
 如果连接了天气 MCP 服务器：
 
@@ -222,11 +252,23 @@ node tests/test-mcp-llm-integration.js
 
 现在你已经了解了如何使用 Node-RED Dev Copilot 的 MCP 工具集成功能！
 
-试试问 AI：
+试试问 AI（现在全部使用英文界面）：
 
-- "你有什么工具？"
-- "帮我分析这个项目"
-- "查看当前目录的文件"
-- "计算 123 + 456"
+- "What tools do you have?"
+- "Help me analyze this project"
+- "Check files in current directory"
+- "Calculate 123 + 456"
+- "Show me how to optimize this Node-RED flow"
 
 享受与 AI 助手的智能对话吧！🚀
+
+## 🆕 最新更新
+
+### V2.0 主要改进
+
+- ✅ **新增 DeepSeek 支持**：集成 DeepSeek API，提供强大的推理能力
+- ✅ **完全英文化**：所有界面、提示和错误信息都使用英文
+- ✅ **官方 SDK**：使用官方 SDK 替代手动 HTTP 请求，提供更好的稳定性
+- ✅ **改进的错误处理**：更清晰的错误信息和调试支持
+- ✅ **SUPCON MCP 服务器**：推荐使用 @supcon-international/node-red-mcp-server
+- ✅ **代码清理**：移除了 Azure OpenAI 支持，简化配置选项

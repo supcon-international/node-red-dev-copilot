@@ -1,32 +1,32 @@
 # Node-RED Dev Copilot
 
-一个集成 AI 开发助手功能的 Node-RED 侧边栏插件，支持 MCP（Model Context Protocol）协议。
+A Node-RED sidebar plugin integrating AI development assistant functionality with MCP (Model Context Protocol) support.
 
 ![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
-## 功能特性
+## Features
 
-- 🤖 **AI 开发助手**: 集成多种 LLM 提供商（OpenAI、Anthropic、Google、DeepSeek）
-- 🔧 **MCP 协议支持**: 支持 Model Context Protocol，自动发现和调用 MCP 工具
-- 🎯 **智能工具调用**: LLM 根据需求自动选择和执行工具，获取实时数据
-- 📱 **侧边栏 UI**: 直接在 Node-RED 编辑器中进行 AI 对话
-- ⚙️ **灵活配置**: 支持多节点配置，不同项目使用不同 AI 设置
-- 🔒 **安全凭证**: 使用 Node-RED 的 credentials 机制安全存储 API 密钥
-- 💬 **多轮对话**: 支持上下文感知的连续对话和工具链调用
-- 🛠️ **开发专用**: 针对 Node-RED 和 JavaScript 开发优化的提示词
+- 🤖 **AI Development Assistant**: Integrates multiple LLM providers (OpenAI, Anthropic, Google, DeepSeek)
+- 🔧 **MCP Protocol Support**: Supports Model Context Protocol for automatic tool discovery and execution
+- 🎯 **Intelligent Tool Calling**: LLM automatically selects and executes tools based on requirements to get real-time data
+- 📱 **Sidebar UI**: Direct AI conversation within the Node-RED editor
+- ⚙️ **Flexible Configuration**: Support for multiple node configurations with different AI settings for different projects
+- 🔒 **Secure Credentials**: Uses Node-RED's credentials mechanism to securely store API keys
+- 💬 **Multi-turn Conversations**: Supports context-aware continuous dialogue and tool chain calls
+- 🛠️ **Development-Focused**: Optimized prompts for Node-RED and JavaScript development
 
-## 安装
+## Installation
 
-### 通过 NPM 安装（推荐）
+### Install via NPM (Recommended)
 
 ```bash
 cd ~/.node-red
 npm install node-red-sidebar-dev-copilot
 ```
 
-### 手动安装
+### Manual Installation
 
-1. 克隆仓库到 Node-RED 用户目录：
+1. Clone the repository to the Node-RED user directory:
 
 ```bash
 cd ~/.node-red
@@ -35,81 +35,97 @@ cd node-red-sidebar-dev-copilot
 npm install
 ```
 
-2. 重启 Node-RED 服务
+2. Restart the Node-RED service
 
-## 配置
+## Configuration
 
-### 1. 添加 Dev Copilot 节点
+### 1. Add Dev Copilot Node
 
-在 Node-RED 编辑器中：
+In the Node-RED editor:
 
-1. 从节点面板的"ai"分类中拖拽"dev copilot"节点到流程中
-2. 双击节点进行配置
+1. Drag the "dev copilot" node from the "ai" category in the node panel to the flow
+2. Double-click the node to configure
 
-### 2. 基本配置
+### 2. Basic Configuration
 
-#### LLM 提供商设置
+#### LLM Provider Settings
 
-- **Provider**: 选择 AI 提供商（openai、anthropic、google、deepseek）
-- **Model**: 指定模型名称（如：gpt-4、claude-3-sonnet、gemini-pro）
-- **API Key**: 输入对应提供商的 API 密钥（将安全存储）
+- **Provider**: Select AI provider (openai, anthropic, google, deepseek)
+- **Model**: Specify model name (e.g., gpt-4, claude-3-5-sonnet-20241022, gemini-1.5-pro, deepseek-chat)
+- **API Key**: Enter the corresponding provider's API key (will be stored securely)
 
-#### MCP 服务器设置（可选）
+#### MCP Server Settings (Optional)
 
-- **MCP Server Path**: MCP 服务器可执行文件路径
-- **MCP Server Args**: 服务器启动参数
-- **System Prompt**: 自定义系统提示词
+- **MCP Server Path**: Path to MCP server executable
+- **MCP Server Args**: Server startup parameters
+- **System Prompt**: Custom system prompt
 
-### 3. 示例配置
+### 3. Example Configurations
 
-#### OpenAI 配置
+#### OpenAI Configuration
 
 ```
 Provider: openai
 Model: gpt-4
-API Key: sk-...（你的OpenAI API密钥）
+API Key: sk-...(your OpenAI API key)
 ```
 
-#### DeepSeek 配置
+#### DeepSeek Configuration
 
 ```
 Provider: deepseek
 Model: deepseek-chat
-API Key: sk-...（你的DeepSeek API密钥）
+API Key: sk-...(your DeepSeek API key)
 ```
 
-#### 使用 MCP 服务器
+#### Anthropic Configuration
+
+```
+Provider: anthropic
+Model: claude-3-5-sonnet-20241022
+API Key: sk-ant-...(your Anthropic API key)
+```
+
+#### Google Configuration
+
+```
+Provider: google
+Model: gemini-1.5-pro
+API Key: ...(your Google API key)
+```
+
+#### Using MCP Server
 
 ```
 MCP Server Path: npx
-MCP Server Args: -y @modelcontextprotocol/server-filesystem /path/to/project
-System Prompt: You are a Node-RED development assistant with filesystem access.
+MCP Server Args: @supcon-international/node-red-mcp-server
+System Prompt: You are a Node-RED development assistant with MCP tools access.
 ```
 
-## 使用方法
+## Usage
 
-### 侧边栏聊天
+### Sidebar Chat
 
-1. 配置完节点后，点击 Node-RED 右侧的"Dev Copilot"侧边栏标签
-2. 从下拉菜单选择要使用的 Dev Copilot 节点
-3. 在输入框中输入问题，按 Enter 发送
-4. AI 将提供针对性的开发建议和代码示例
+1. After configuring the node, click the "Dev Copilot" sidebar tab on the right side of Node-RED
+2. Select the Dev Copilot node to use from the dropdown menu
+3. Enter your question in the input box and press Enter to send
+4. The AI will provide targeted development advice and code examples
 
-### 流程集成
+### Flow Integration
 
-Dev Copilot 节点也可以作为普通的 Node-RED 节点使用：
+The Dev Copilot node can also be used as a regular Node-RED node:
 
 ```javascript
-// 输入消息格式
+// Input message format
 msg = {
     payload: "How to create a HTTP request node in Node-RED?",
-    history: [  // 可选的对话历史
+    history: [  // Optional conversation history
         {role: "user", content: "Previous question"},
         {role: "assistant", content: "Previous answer"}
     ]
 }
 
-// 输出消息格式
+// Output message format
 msg = {
     payload: "AI response text",
     llm_config: {
@@ -118,168 +134,172 @@ msg = {
         system_prompt: "..."
     },
     mcp_available: true,
-    mcp_tools: [...]  // 可用的MCP工具列表
+    mcp_tools: [...]  // Available MCP tools list
 }
 ```
 
-## MCP 集成
+## MCP Integration
 
-### 支持的 MCP 功能
+### Supported MCP Features
 
-- ✅ **Tools**: 调用 MCP 服务器提供的工具
-- ✅ **Resources**: 访问 MCP 服务器的资源
-- ✅ **Prompts**: 使用 MCP 服务器的提示模板
-- ✅ **Stdio Transport**: 通过 stdio 与 MCP 服务器通信
+- ✅ **Tools**: Call tools provided by MCP servers
+- ✅ **Resources**: Access resources from MCP servers
+- ✅ **Prompts**: Use prompt templates from MCP servers
+- ✅ **Stdio Transport**: Communicate with MCP servers via stdio
 
-### 常用 MCP 服务器
+### Common MCP Servers
 
 ```bash
-# 文件系统服务器
+# SUPCON Node-RED MCP Server (Recommended)
+npx @supcon-international/node-red-mcp-server
+
+# Filesystem server
 npx -y @modelcontextprotocol/server-filesystem /path/to/project
 
-# Git服务器
+# Git server
 npx -y @modelcontextprotocol/server-git /path/to/repo
 
-# SQLite服务器
+# SQLite server
 npx -y @modelcontextprotocol/server-sqlite /path/to/database.db
 
-# 浏览器自动化
+# Browser automation
 npx -y @modelcontextprotocol/server-puppeteer
 ```
 
-## API 参考
+## API Reference
 
-### HTTP 端点
+### HTTP Endpoints
 
-- `GET /dev-copilot/sidebar` - 获取侧边栏 HTML
-- `POST /dev-copilot/chat` - 发送聊天消息
-- `GET /dev-copilot/nodes` - 获取可用节点列表
+- `GET /dev-copilot/sidebar` - Get sidebar HTML
+- `POST /dev-copilot/chat` - Send chat message
+- `GET /dev-copilot/nodes` - Get available nodes list
 
-### 节点配置属性
+### Node Configuration Properties
 
-| 属性          | 类型        | 必填 | 描述           |
-| ------------- | ----------- | ---- | -------------- |
-| name          | string      | 否   | 节点显示名称   |
-| provider      | string      | 是   | LLM 提供商     |
-| model         | string      | 是   | 模型名称       |
-| apiKey        | credentials | 是   | API 密钥       |
-| mcpServerPath | string      | 否   | MCP 服务器路径 |
-| mcpServerArgs | string      | 否   | MCP 服务器参数 |
-| systemPrompt  | string      | 否   | 系统提示词     |
+| Property      | Type        | Required | Description           |
+| ------------- | ----------- | -------- | --------------------- |
+| name          | string      | No       | Node display name     |
+| provider      | string      | Yes      | LLM provider          |
+| model         | string      | Yes      | Model name            |
+| apiKey        | credentials | Yes      | API key               |
+| mcpServerPath | string      | No       | MCP server path       |
+| mcpServerArgs | string      | No       | MCP server parameters |
+| systemPrompt  | string      | No       | System prompt         |
 
-## 开发
+## Development
 
-### 项目结构
+### Project Structure
 
 ```
 node-red-sidebar-dev-copilot/
-├── package.json              # NPM包配置
+├── package.json              # NPM package configuration
 ├── nodes/
-│   ├── dev-copilot.js       # 节点后端逻辑
-│   └── dev-copilot.html     # 节点前端配置
+│   ├── dev-copilot.js       # Node backend logic
+│   └── dev-copilot.html     # Node frontend configuration
 ├── public/
-│   └── sidebar.html         # 侧边栏界面
+│   └── sidebar.html         # Sidebar interface
 ├── mcp/
-│   └── mcp-client.js        # MCP客户端辅助类
-└── README.md                # 说明文档
+│   └── mcp-client.js        # MCP client helper class
+└── README.md                # Documentation
 ```
 
-### 本地开发
+### Local Development
 
-1. 克隆项目：
+1. Clone the project:
 
 ```bash
 git clone https://github.com/supcon-international/node-red-sidebar-dev-copilot.git
 cd node-red-sidebar-dev-copilot
 ```
 
-2. 安装依赖：
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. 链接到 Node-RED：
+3. Link to Node-RED:
 
 ```bash
 cd ~/.node-red
 npm link /path/to/node-red-sidebar-dev-copilot
 ```
 
-4. 重启 Node-RED 进行测试
+4. Restart Node-RED for testing
 
-### 测试 MCP 连接
+### Testing MCP Connection
 
-使用 MCP Inspector 测试服务器连接：
+Use MCP Inspector to test server connection:
 
 ```bash
 npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/server-filesystem .
 ```
 
-## 故障排除
+## Troubleshooting
 
-### 常见问题
+### Common Issues
 
-1. **侧边栏不显示**
+1. **Sidebar not displaying**
 
-   - 检查 Node-RED 版本是否>=3.0.0
-   - 确认插件正确安装
-   - 查看浏览器控制台错误信息
+   - Check if Node-RED version is >=3.0.0
+   - Confirm plugin is correctly installed
+   - Check browser console for error messages
 
-2. **MCP 连接失败**
+2. **MCP connection failed**
 
-   - 验证 MCP 服务器路径是否正确
-   - 检查服务器参数格式
-   - 使用 MCP Inspector 测试服务器
+   - Verify MCP server path is correct
+   - Check server parameter format
+   - Use MCP Inspector to test server
 
-3. **API 调用失败**
-   - 确认 API 密钥有效
-   - 检查网络连接
-   - 验证模型名称正确
+3. **API call failed**
+   - Confirm API key is valid
+   - Check network connection
+   - Verify model name is correct
+   - Check if API quota is sufficient
 
-### 调试日志
+### Debug Logs
 
-启用 Node-RED 调试日志：
+Enable Node-RED debug logs:
 
 ```bash
 DEBUG=* node-red
 ```
 
-查看 Dev Copilot 相关日志：
+View Dev Copilot related logs:
 
 ```bash
 DEBUG=node-red-sidebar-dev-copilot:* node-red
 ```
 
-## 贡献
+## Contributing
 
-欢迎提交 Issue 和 Pull Request！
+Issues and Pull Requests are welcome!
 
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送分支 (`git push origin feature/amazing-feature`)
-5. 创建 Pull Request
+1. Fork the project
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push the branch (`git push origin feature/amazing-feature`)
+5. Create a Pull Request
 
-## 许可证
+## License
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 相关链接
+## Related Links
 
-- [Node-RED 官网](https://nodered.org/)
+- [Node-RED Official Website](https://nodered.org/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [SUPCON 国际](https://www.supcon.com/)
+- [SUPCON International](https://www.supcon.com/)
 
-## 支持
+## Support
 
-如有问题，请：
+If you have questions, please:
 
-1. 查看[文档](README.md)
-2. 搜索[已有 Issues](https://github.com/supcon-international/node-red-sidebar-dev-copilot/issues)
-3. 创建新 Issue 描述问题
-4. 联系 SUPCON 技术支持
+1. Check the [documentation](README.md)
+2. Search [existing Issues](https://github.com/supcon-international/node-red-sidebar-dev-copilot/issues)
+3. Create a new Issue describing the problem
+4. Contact SUPCON technical support
 
 ---
 

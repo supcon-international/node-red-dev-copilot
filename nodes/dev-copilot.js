@@ -6,7 +6,7 @@ const MCPClientHelper = require(path.join(
   "mcp-client.js"
 ));
 
-// 导入官方SDK
+// Import official SDKs
 const OpenAI = require("openai");
 const Anthropic = require("@anthropic-ai/sdk");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -18,7 +18,7 @@ module.exports = function (RED) {
     RED.nodes.createNode(this, config);
     const node = this;
 
-    // 获取配置属性
+    // Get configuration properties
     node.provider = config.provider || "openai";
     node.model = config.model || "gpt-4";
     node.mcpCommand = config.mcpCommand || "";
@@ -27,18 +27,20 @@ module.exports = function (RED) {
     node.systemPrompt =
       config.systemPrompt || "You are a helpful development assistant.";
 
-    // 获取敏感信息（credentials）
+    // Get sensitive information (credentials)
     node.apiKey = node.credentials.apiKey || "";
 
-    // 初始化LLM SDK客户端
+    // Initialize LLM SDK clients
     node.initSDKClients = function () {
       if (!node.apiKey) {
-        node.warn(`⚠️ 无法初始化 ${node.provider} SDK: API密钥为空`);
+        node.warn(
+          `⚠️ Cannot initialize ${node.provider} SDK: API key is empty`
+        );
         return;
       }
 
       try {
-        node.log(`🔧 初始化 ${node.provider} SDK客户端...`);
+        node.log(`🔧 Initializing ${node.provider} SDK client...`);
 
         switch (node.provider.toLowerCase()) {
           case "openai":
@@ -64,22 +66,24 @@ module.exports = function (RED) {
             node.googleClient = new GoogleGenerativeAI(node.apiKey);
             break;
           default:
-            throw new Error(`不支持的Provider: ${node.provider}`);
+            throw new Error(`Unsupported provider: ${node.provider}`);
         }
 
-        node.log(`✅ ${node.provider} SDK客户端初始化成功`);
+        node.log(`✅ ${node.provider} SDK client initialized successfully`);
       } catch (error) {
-        node.error(`❌ ${node.provider} SDK客户端初始化失败: ${error.message}`);
         node.error(
-          `调试信息: Provider=${node.provider}, 有API密钥=${!!node.apiKey}`
+          `❌ ${node.provider} SDK client initialization failed: ${error.message}`
+        );
+        node.error(
+          `Debug info: Provider=${node.provider}, Has API key=${!!node.apiKey}`
         );
       }
     };
 
-    // MCP 客户端实例 - 使用新的 MCPClientHelper
+    // MCP client instance - using new MCPClientHelper
     node.mcpClient = new MCPClientHelper();
 
-    // 系统提示词（预设）
+    // System prompt (default)
     node.defaultSystemPrompt = `You are a development assistant integrated into Node-RED. 
 You can help with:
 - Node-RED flow development
@@ -90,10 +94,10 @@ You can help with:
 
 Please provide clear, actionable advice and code examples when appropriate.`;
 
-    // 初始化 MCP 连接 - 简化配置
+    // Initialize MCP connection - simplified configuration
     node.initMCP = async function () {
       if (!node.mcpCommand) {
-        node.warn("MCP 命令未配置");
+        node.warn("MCP command not configured");
         node.status({
           fill: "yellow",
           shape: "ring",
@@ -103,12 +107,12 @@ Please provide clear, actionable advice and code examples when appropriate.`;
       }
 
       try {
-        // 解析参数
+        // Parse arguments
         const args = node.mcpArgs
           ? node.mcpArgs.split(" ").filter((arg) => arg.trim())
           : [];
 
-        // 解析环境变量
+        // Parse environment variables
         let env = {};
         if (node.mcpEnv) {
           const envPairs = node.mcpEnv.split(",");
@@ -120,16 +124,16 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           }
         }
 
-        node.log(`🔌 初始化 MCP 连接:`);
-        node.log(`   命令: ${node.mcpCommand}`);
+        node.log(`🔌 Initializing MCP connection:`);
+        node.log(`   Command: ${node.mcpCommand}`);
         if (args.length > 0) {
-          node.log(`   参数: ${args.join(" ")}`);
+          node.log(`   Arguments: ${args.join(" ")}`);
         }
         if (Object.keys(env).length > 0) {
-          node.log(`   环境变量: ${JSON.stringify(env)}`);
+          node.log(`   Environment variables: ${JSON.stringify(env)}`);
         }
 
-        // 连接到 MCP 服务器
+        // Connect to MCP server
         const success = await node.mcpClient.connect(
           node.mcpCommand,
           args,
@@ -137,12 +141,12 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         );
 
         if (success) {
-          // 获取服务器信息
+          // Get server information
           const serverInfo = await node.mcpClient.getServerInfo();
 
-          node.log(`✅ MCP 服务器连接成功`);
-          node.log(`   工具数量: ${serverInfo.tools.length}`);
-          node.log(`   资源数量: ${serverInfo.resources.length}`);
+          node.log(`✅ MCP server connected successfully`);
+          node.log(`   Tools count: ${serverInfo.tools.length}`);
+          node.log(`   Resources count: ${serverInfo.resources.length}`);
 
           node.status({
             fill: "green",
@@ -152,10 +156,10 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
           return true;
         } else {
-          throw new Error("连接失败");
+          throw new Error("Connection failed");
         }
       } catch (error) {
-        node.error(`❌ MCP 服务器连接失败: ${error.message}`);
+        node.error(`❌ MCP server connection failed: ${error.message}`);
         node.status({
           fill: "red",
           shape: "ring",
@@ -165,20 +169,20 @@ Please provide clear, actionable advice and code examples when appropriate.`;
       }
     };
 
-    // 断开 MCP 连接
+    // Disconnect MCP connection
     node.disconnectMCP = async function () {
       if (node.mcpClient && node.mcpClient.isClientConnected()) {
         try {
           await node.mcpClient.cleanup();
-          node.log("🔌 MCP 服务器连接已断开");
+          node.log("🔌 MCP server connection disconnected");
           node.status({ fill: "grey", shape: "ring", text: "disconnected" });
         } catch (error) {
-          node.error("断开 MCP 服务器连接时出错: " + error.message);
+          node.error("Error disconnecting MCP server: " + error.message);
         }
       }
     };
 
-    // 获取MCP工具列表 - 使用新的客户端助手
+    // Get MCP tools list - using new client helper
     node.getMCPTools = async function () {
       const tools = [];
 
@@ -186,7 +190,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         try {
           const mcpTools = await node.mcpClient.listTools();
 
-          // 转换MCP工具格式为LLM API工具格式
+          // Convert MCP tool format to LLM API tool format
           for (const tool of mcpTools) {
             tools.push({
               type: "function",
@@ -199,41 +203,41 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           }
 
           node.log(
-            `🔧 发现 ${tools.length} 个MCP工具: ${mcpTools
+            `🔧 Found ${tools.length} MCP tools: ${mcpTools
               .map((t) => t.name)
               .join(", ")}`
           );
         } catch (error) {
-          node.warn("获取MCP工具列表失败: " + error.message);
+          node.warn("Failed to get MCP tools list: " + error.message);
         }
       }
 
       return tools;
     };
 
-    // 执行MCP工具调用 - 使用新的客户端助手
+    // Execute MCP tool call - using new client helper
     node.executeMCPTool = async function (toolName, toolArgs) {
       if (!node.mcpClient || !node.mcpClient.isClientConnected()) {
-        throw new Error("MCP 客户端未连接");
+        throw new Error("MCP client not connected");
       }
 
       try {
         const result = await node.mcpClient.callTool(toolName, toolArgs);
         return result;
       } catch (error) {
-        node.error(`MCP 工具调用失败 ${toolName}: ${error.message}`);
+        node.error(`MCP tool call failed ${toolName}: ${error.message}`);
         throw error;
       }
     };
 
-    // 格式化工具结果 - 确保符合 LLM API 要求
+    // Format tool result - ensure compliance with LLM API requirements
     node.formatToolResult = function (toolResult) {
       let resultContent;
 
       try {
         if (toolResult && toolResult.content) {
           if (Array.isArray(toolResult.content)) {
-            // 如果是数组，提取文本内容
+            // If it's an array, extract text content
             resultContent = toolResult.content
               .map((item) => {
                 if (typeof item === "string") return item;
@@ -255,34 +259,26 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           resultContent = JSON.stringify(toolResult || "No result");
         }
 
-        // 限制结果长度，避免请求体过大
-        if (resultContent.length > 4000) {
-          resultContent =
-            resultContent.substring(0, 4000) +
-            "\n\n... [结果已截断，共" +
-            resultContent.length +
-            "字符]";
-        }
-
+        // Return complete result without truncation
         return resultContent;
       } catch (error) {
         return `Error formatting result: ${error.message}`;
       }
     };
 
-    // 调用 LLM API（集成MCP工具）
+    // Call LLM API (integrated with MCP tools)
     node.callLLM = async function (messages) {
       if (!node.apiKey) {
         throw new Error(
-          `API密钥未配置，请在节点配置中设置${node.provider}的API密钥`
+          `API key not configured, please set ${node.provider} API key in node configuration`
         );
       }
 
       try {
-        // 获取可用的MCP工具
+        // Get available MCP tools
         const availableTools = await node.getMCPTools();
 
-        node.log(`🤖 调用 ${node.provider} API, 模型: ${node.model}`);
+        node.log(`🤖 Calling ${node.provider} API, model: ${node.model}`);
 
         switch (node.provider.toLowerCase()) {
           case "openai":
@@ -294,36 +290,38 @@ Please provide clear, actionable advice and code examples when appropriate.`;
             return await node.callGoogleWithTools(messages, availableTools);
 
           default:
-            throw new Error(`不支持的LLM提供商: ${node.provider}`);
+            throw new Error(`Unsupported LLM provider: ${node.provider}`);
         }
       } catch (error) {
-        node.error(`LLM API调用失败 (${node.provider}): ${error.message}`);
+        node.error(`LLM API call failed (${node.provider}): ${error.message}`);
 
-        // 打印更详细的错误信息用于调试
+        // Print detailed error information for debugging
         if (error.response) {
-          node.error(`API响应状态: ${error.response.status}`);
-          node.error(`API响应数据: ${JSON.stringify(error.response.data)}`);
+          node.error(`API response status: ${error.response.status}`);
+          node.error(
+            `API response data: ${JSON.stringify(error.response.data)}`
+          );
         }
 
-        // 如果API调用失败，返回错误信息而不是崩溃
+        // If API call fails, return error message instead of crashing
         return {
-          content: `❌ LLM API调用失败 (${node.provider}): ${error.message}\n\n请检查：\n1. API密钥是否正确\n2. 网络连接是否正常\n3. 模型名称是否有效\n4. API配额是否充足`,
+          content: `❌ LLM API call failed (${node.provider}): ${error.message}\n\nPlease check:\n1. API key is correct\n2. Network connection is working\n3. Model name is valid\n4. API quota is sufficient`,
           error: true,
         };
       }
     };
 
-    // OpenAI API 调用（带工具集成）- 使用官方SDK
+    // OpenAI API call (with tool integration) - using official SDK
     node.callOpenAIWithTools = async function (messages, tools) {
       if (!node.openaiClient) {
-        throw new Error("OpenAI客户端未初始化");
+        throw new Error("OpenAI client not initialized");
       }
 
       let conversationMessages = [...messages];
       let finalContent = [];
       let lastResponse = null;
 
-      // 最多执行5轮工具调用，防止无限循环
+      // Execute up to 5 rounds of tool calls to prevent infinite loops
       for (let round = 0; round < 5; round++) {
         const requestParams = {
           model: node.model,
@@ -332,7 +330,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           max_tokens: 2000,
         };
 
-        // 如果有可用工具，添加到请求中
+        // If tools are available, add them to the request
         if (tools && tools.length > 0) {
           requestParams.tools = tools;
           requestParams.tool_choice = "auto";
@@ -346,15 +344,14 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         const message = response.choices[0].message;
         conversationMessages.push(message);
 
-        // 检查是否有工具调用
+        // Check if there are tool calls
         if (message.tool_calls && message.tool_calls.length > 0) {
-          // 执行工具调用
+          // Execute tool calls
           for (const toolCall of message.tool_calls) {
             const toolName = toolCall.function.name;
             const toolArgs = JSON.parse(toolCall.function.arguments);
 
-            finalContent.push(`🔧 调用工具: ${toolName}`);
-            finalContent.push(`📝 参数: ${JSON.stringify(toolArgs, null, 2)}`);
+            finalContent.push(`🔧 Calling tool: ${toolName}`);
 
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
@@ -365,13 +362,6 @@ Please provide clear, actionable advice and code examples when appropriate.`;
                 tool_call_id: toolCall.id,
                 content: formattedResult,
               });
-
-              const displayResult =
-                formattedResult.length > 500
-                  ? formattedResult.substring(0, 500) + "...[已截断]"
-                  : formattedResult;
-
-              finalContent.push(`✅ 工具结果: ${displayResult}`);
             } catch (error) {
               conversationMessages.push({
                 role: "tool",
@@ -379,7 +369,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
                 content: `Error: ${error.message}`,
               });
 
-              finalContent.push(`❌ 工具调用失败: ${error.message}`);
+              finalContent.push(`❌ Tool call failed: ${error.message}`);
             }
           }
 
@@ -390,16 +380,29 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         }
       }
 
+      // Separate tool calls from final content
+      const toolCallsInfo = finalContent
+        .filter((line) => line.startsWith("🔧") || line.startsWith("❌"))
+        .join("\n\n");
+      const aiResponse = finalContent
+        .filter((line) => !line.startsWith("🔧") && !line.startsWith("❌"))
+        .join("\n\n");
+
+      // Combine tool calls info and AI response
+      const displayContent = toolCallsInfo
+        ? `${toolCallsInfo}\n\n${aiResponse}`
+        : aiResponse;
+
       return {
-        content: finalContent.join("\n\n"),
+        content: displayContent,
         usage: lastResponse ? lastResponse.usage : null,
       };
     };
 
-    // Anthropic API 调用（带工具集成）- 使用官方SDK
+    // Anthropic API call (with tool integration) - using official SDK
     node.callAnthropicWithTools = async function (messages, tools) {
       if (!node.anthropicClient) {
-        throw new Error("Anthropic客户端未初始化");
+        throw new Error("Anthropic client not initialized");
       }
 
       const systemMessage = messages.find((m) => m.role === "system");
@@ -407,9 +410,9 @@ Please provide clear, actionable advice and code examples when appropriate.`;
       let finalContent = [];
       let lastResponse = null;
 
-      // 如果没有工具，使用简单调用
+      // If no tools, use simple call
       if (!tools || tools.length === 0) {
-        node.log(`📤 Anthropic API 简单调用 - 无工具`);
+        node.log(`📤 Anthropic API simple call - no tools`);
 
         const requestParams = {
           model: node.model,
@@ -435,7 +438,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         };
       }
 
-      // 转换工具格式为Anthropic格式
+      // Convert tool format to Anthropic format
       const anthropicTools = tools.map((tool) => ({
         name: tool.function.name,
         description: tool.function.description,
@@ -443,10 +446,10 @@ Please provide clear, actionable advice and code examples when appropriate.`;
       }));
 
       node.log(
-        `📤 Anthropic API 请求 - 消息数: ${conversationMessages.length}, 工具数: ${anthropicTools.length}`
+        `📤 Anthropic API request - messages: ${conversationMessages.length}, tools: ${anthropicTools.length}`
       );
 
-      // 最多执行5轮工具调用，防止无限循环
+      // Execute up to 5 rounds of tool calls to prevent infinite loops
       for (let round = 0; round < 5; round++) {
         const requestParams = {
           model: node.model,
@@ -466,7 +469,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
         const responseContent = response.content;
 
-        // 检查响应中是否有工具调用
+        // Check if there are tool calls in the response
         const toolUses = responseContent.filter(
           (content) => content.type === "tool_use"
         );
@@ -474,13 +477,13 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           (content) => content.type === "text"
         );
 
-        // 添加文本内容
+        // Add text content
         if (textContent.length > 0) {
           finalContent.push(textContent.map((t) => t.text).join("\n"));
         }
 
         if (toolUses.length > 0) {
-          // 添加助手消息到对话历史
+          // Add assistant message to conversation history
           conversationMessages.push({
             role: "assistant",
             content: responseContent,
@@ -488,18 +491,17 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
           const toolResults = [];
 
-          // 执行工具调用
+          // Execute tool calls
           for (const toolUse of toolUses) {
             const toolName = toolUse.name;
             const toolArgs = toolUse.input;
 
-            finalContent.push(`🔧 调用工具: ${toolName}`);
-            finalContent.push(`📝 参数: ${JSON.stringify(toolArgs, null, 2)}`);
+            finalContent.push(`🔧 Calling tool: ${toolName}`);
 
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
 
-              // 格式化工具结果
+              // Format tool result
               const formattedResult = node.formatToolResult(toolResult);
 
               toolResults.push({
@@ -507,14 +509,6 @@ Please provide clear, actionable advice and code examples when appropriate.`;
                 tool_use_id: toolUse.id,
                 content: formattedResult,
               });
-
-              // 为显示目的截断结果
-              const displayResult =
-                formattedResult.length > 500
-                  ? formattedResult.substring(0, 500) + "...[已截断]"
-                  : formattedResult;
-
-              finalContent.push(`✅ 工具结果: ${displayResult}`);
             } catch (error) {
               toolResults.push({
                 type: "tool_result",
@@ -522,48 +516,61 @@ Please provide clear, actionable advice and code examples when appropriate.`;
                 content: `Error: ${error.message}`,
               });
 
-              finalContent.push(`❌ 工具调用失败: ${error.message}`);
+              finalContent.push(`❌ Tool call failed: ${error.message}`);
             }
           }
 
-          // 添加工具结果到对话
+          // Add tool results to conversation
           conversationMessages.push({
             role: "user",
             content: toolResults,
           });
 
-          // 继续对话，让Claude处理工具结果
+          // Continue conversation, let Claude process tool results
           continue;
         } else {
-          // 没有工具调用，返回最终响应
+          // No tool calls, return final response
           break;
         }
       }
 
+      // Separate tool calls from final content
+      const toolCallsInfo = finalContent
+        .filter((line) => line.startsWith("🔧") || line.startsWith("❌"))
+        .join("\n\n");
+      const aiResponse = finalContent
+        .filter((line) => !line.startsWith("🔧") && !line.startsWith("❌"))
+        .join("\n\n");
+
+      // Combine tool calls info and AI response
+      const displayContent = toolCallsInfo
+        ? `${toolCallsInfo}\n\n${aiResponse}`
+        : aiResponse;
+
       return {
-        content: finalContent.join("\n\n"),
+        content: displayContent,
         usage: lastResponse ? lastResponse.usage : null,
       };
     };
 
-    // Google Gemini API 调用（带工具集成）- 使用官方SDK
+    // Google Gemini API call (with tool integration) - using official SDK
     node.callGoogleWithTools = async function (messages, tools) {
       if (!node.googleClient) {
-        throw new Error("Google客户端未初始化");
+        throw new Error("Google client not initialized");
       }
 
       const systemInstruction = messages.find((m) => m.role === "system");
       let conversationMessages = messages.filter((m) => m.role !== "system");
       let finalContent = [];
 
-      // 获取模型实例
+      // Get model instance
       const model = node.googleClient.getGenerativeModel({ model: node.model });
 
-      // 如果没有工具，使用简单调用
+      // If no tools, use simple call
       if (!tools || tools.length === 0) {
-        node.log(`📤 Google API 简单调用 - 无工具`);
+        node.log(`📤 Google API simple call - no tools`);
 
-        // 构建对话历史
+        // Build conversation history
         const history = [];
         for (let i = 0; i < conversationMessages.length - 1; i += 2) {
           if (conversationMessages[i] && conversationMessages[i + 1]) {
@@ -578,11 +585,11 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           }
         }
 
-        // 获取最后一条用户消息
+        // Get the last user message
         const lastMessage =
           conversationMessages[conversationMessages.length - 1];
         if (!lastMessage || lastMessage.role !== "user") {
-          throw new Error("最后一条消息必须是用户消息");
+          throw new Error("Last message must be a user message");
         }
 
         const chat = model.startChat({
@@ -605,18 +612,18 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         };
       }
 
-      // 实现Google SDK的工具调用功能
+      // Implement Google SDK tool calling functionality
       node.log(
-        `📤 Google API 请求 - 消息数: ${conversationMessages.length}, 工具数: ${tools.length}`
+        `📤 Google API request - messages: ${conversationMessages.length}, tools: ${tools.length}`
       );
 
-      // 清理JSON Schema以适配Google API
+      // Clean JSON Schema to adapt to Google API
       const cleanSchemaForGoogle = function (schema) {
         if (!schema || typeof schema !== "object") return schema;
 
-        const cleaned = JSON.parse(JSON.stringify(schema)); // 深拷贝
+        const cleaned = JSON.parse(JSON.stringify(schema)); // Deep copy
 
-        // 递归清理对象
+        // Recursively clean object
         function cleanObject(obj) {
           if (typeof obj !== "object" || obj === null) return obj;
 
@@ -624,7 +631,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
             return obj.map(cleanObject);
           }
 
-          // 移除Google API不支持的字段
+          // Remove fields not supported by Google API
           const unsupportedFields = [
             "$schema",
             "additionalProperties",
@@ -637,7 +644,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
             delete obj[field];
           });
 
-          // 递归处理所有属性
+          // Recursively process all properties
           for (const key in obj) {
             obj[key] = cleanObject(obj[key]);
           }
@@ -648,14 +655,14 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         return cleanObject(cleaned);
       };
 
-      // 转换工具格式为Google格式
+      // Convert tool format to Google format
       const googleTools = tools.map((tool) => ({
         name: tool.function.name,
         description: tool.function.description,
         parameters: cleanSchemaForGoogle(tool.function.parameters),
       }));
 
-      // 创建带工具的模型实例
+      // Create model instance with tools
       const modelWithTools = node.googleClient.getGenerativeModel({
         model: node.model,
         tools: [{ functionDeclarations: googleTools }],
@@ -666,9 +673,9 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
       let lastResponse = null;
 
-      // 最多执行5轮工具调用
+      // Execute up to 5 rounds of tool calls
       for (let round = 0; round < 5; round++) {
-        // 构建当前对话历史
+        // Build current conversation history
         const history = [];
         for (let i = 0; i < conversationMessages.length - 1; i += 2) {
           if (conversationMessages[i] && conversationMessages[i + 1]) {
@@ -686,7 +693,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         const lastMessage =
           conversationMessages[conversationMessages.length - 1];
         if (!lastMessage || lastMessage.role !== "user") {
-          throw new Error("最后一条消息必须是用户消息");
+          throw new Error("Last message must be a user message");
         }
 
         const chat = modelWithTools.startChat({
@@ -701,21 +708,21 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         const response = await result.response;
         lastResponse = response;
 
-        // 检查是否有函数调用
+        // Check if there are function calls
         let functionCalls = [];
         try {
           functionCalls = response.functionCalls() || [];
         } catch (error) {
-          // 如果没有function calls，会抛出错误，这是正常的
-          node.log("🔍 Google API: 没有检测到函数调用");
+          // If no function calls, an error will be thrown, which is normal
+          node.log("🔍 Google API: No function calls detected");
           functionCalls = [];
         }
 
         if (functionCalls && functionCalls.length > 0) {
-          // 有工具调用
-          node.log(`🔧 Google API 检测到 ${functionCalls.length} 个工具调用`);
+          // Has tool calls
+          node.log(`🔧 Google API detected ${functionCalls.length} tool calls`);
 
-          // 添加模型响应到对话历史
+          // Add model response to conversation history
           const responseText = response.text() || "[Function calls]";
           conversationMessages.push({
             role: "assistant",
@@ -728,8 +735,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
             const toolName = functionCall.name;
             const toolArgs = functionCall.args;
 
-            finalContent.push(`🔧 调用工具: ${toolName}`);
-            finalContent.push(`📝 参数: ${JSON.stringify(toolArgs, null, 2)}`);
+            finalContent.push(`🔧 Calling tool: ${toolName}`);
 
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
@@ -738,22 +744,15 @@ Please provide clear, actionable advice and code examples when appropriate.`;
               functionResponses.push(
                 `Function ${toolName} result: ${formattedResult}`
               );
-
-              const displayResult =
-                formattedResult.length > 500
-                  ? formattedResult.substring(0, 500) + "...[已截断]"
-                  : formattedResult;
-
-              finalContent.push(`✅ 工具结果: ${displayResult}`);
             } catch (error) {
               functionResponses.push(
                 `Function ${toolName} error: ${error.message}`
               );
-              finalContent.push(`❌ 工具调用失败: ${error.message}`);
+              finalContent.push(`❌ Tool call failed: ${error.message}`);
             }
           }
 
-          // 发送工具调用结果
+          // Send tool call results
           const functionResponseMessage = functionResponses.join("\n\n");
           conversationMessages.push({
             role: "user",
@@ -762,24 +761,37 @@ Please provide clear, actionable advice and code examples when appropriate.`;
 
           continue;
         } else {
-          // 没有工具调用，返回最终响应
+          // No tool calls, return final response
           finalContent.push(response.text());
           break;
         }
       }
 
+      // Separate tool calls from final content
+      const toolCallsInfo = finalContent
+        .filter((line) => line.startsWith("🔧") || line.startsWith("❌"))
+        .join("\n\n");
+      const aiResponse = finalContent
+        .filter((line) => !line.startsWith("🔧") && !line.startsWith("❌"))
+        .join("\n\n");
+
+      // Combine tool calls info and AI response
+      const displayContent = toolCallsInfo
+        ? `${toolCallsInfo}\n\n${aiResponse}`
+        : aiResponse;
+
       return {
-        content: finalContent.join("\n\n"),
+        content: displayContent,
         usage: lastResponse ? lastResponse.usageMetadata || null : null,
       };
     };
 
-    // 处理输入消息
+    // Process input messages
     node.on("input", async function (msg) {
       try {
         node.status({ fill: "blue", shape: "dot", text: "processing" });
 
-        // 构建消息历史
+        // Build message history
         const messages = [
           {
             role: "system",
@@ -787,7 +799,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           },
         ];
 
-        // 添加用户消息
+        // Add user message
         if (msg.payload) {
           messages.push({
             role: "user",
@@ -798,15 +810,15 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           });
         }
 
-        // 如果有历史消息，添加到对话中
+        // If there are historical messages, add them to the conversation
         if (msg.history && Array.isArray(msg.history)) {
           messages.splice(1, 0, ...msg.history);
         }
 
-        // 调用 LLM
+        // Call LLM
         const response = await node.callLLM(messages);
 
-        // 准备输出消息
+        // Prepare output message
         const outputMsg = {
           ...msg,
           payload: response.content,
@@ -818,7 +830,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           mcp_available: !!node.mcpClient,
         };
 
-        // 如果有 MCP 工具可用，添加工具信息
+        // If MCP tools are available, add tool information
         if (node.mcpClient) {
           try {
             const tools = await node.getMCPTools();
@@ -838,7 +850,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         node.error("Error processing message: " + error.message);
         node.status({ fill: "red", shape: "ring", text: "error" });
 
-        // 发送错误消息
+        // Send error message
         const errorMsg = {
           ...msg,
           payload: "Error: " + error.message,
@@ -848,21 +860,21 @@ Please provide clear, actionable advice and code examples when appropriate.`;
       }
     });
 
-    // 节点关闭时清理资源
+    // Clean up resources when node is closed
     node.on("close", async function () {
       await node.disconnectMCP();
     });
 
-    // 初始化SDK客户端
+    // Initialize SDK clients
     node.initSDKClients();
 
-    // 初始化时尝试连接 MCP
+    // Try to connect to MCP on initialization
     if (node.mcpCommand) {
       setImmediate(() => {
         node.initMCP();
       });
     } else {
-      // 没有配置MCP（这是正常的）
+      // No MCP configured (this is normal)
       node.status({
         fill: "blue",
         shape: "ring",
@@ -871,19 +883,19 @@ Please provide clear, actionable advice and code examples when appropriate.`;
     }
   }
 
-  // 注册节点
+  // Register node
   RED.nodes.registerType("dev-copilot", DevCopilotNode, {
     credentials: {
       apiKey: { type: "password" },
     },
   });
 
-  // 注册侧边栏
+  // Register sidebar
   RED.httpAdmin.get("/dev-copilot/sidebar", function (req, res) {
     const path = require("path");
     const sidebarPath = path.join(__dirname, "..", "public", "sidebar.html");
 
-    // 检查文件是否存在
+    // Check if file exists
     const fs = require("fs");
     if (fs.existsSync(sidebarPath)) {
       res.sendFile(sidebarPath);
@@ -893,24 +905,24 @@ Please provide clear, actionable advice and code examples when appropriate.`;
     }
   });
 
-  // API 端点：发送消息给 copilot
+  // API endpoint: send message to copilot
   RED.httpAdmin.post("/dev-copilot/chat", async function (req, res) {
     try {
       const { message, nodeId, history } = req.body;
 
-      // 调试信息
-      console.log("🔍 Chat API 调试信息:");
-      console.log(`   请求的 nodeId: ${nodeId}`);
-      console.log(`   消息内容: ${message}`);
+      // Debug information
+      console.log("🔍 Chat API debug info:");
+      console.log(`   Requested nodeId: ${nodeId}`);
+      console.log(`   Message content: ${message}`);
 
-      // 如果没有提供nodeId，尝试查找可用的节点
+      // If no nodeId provided, try to find available node
       let node;
       if (nodeId) {
         node = RED.nodes.getNode(nodeId);
-        console.log(`   查找节点结果: ${node ? "找到" : "未找到"}`);
+        console.log(`   Node lookup result: ${node ? "found" : "not found"}`);
 
         if (!node) {
-          // 提供更详细的调试信息
+          // Provide more detailed debug information
           const allNodes = [];
           RED.nodes.eachNode(function (n) {
             if (n.type === "dev-copilot") {
@@ -918,20 +930,20 @@ Please provide clear, actionable advice and code examples when appropriate.`;
               allNodes.push({
                 configId: n.id,
                 runtimeExists: !!runtimeNode,
-                name: n.name || "未命名",
+                name: n.name || "unnamed",
               });
             }
           });
 
-          console.log("   所有 dev-copilot 节点状态:", allNodes);
+          console.log("   All dev-copilot node status:", allNodes);
 
           return res.status(404).json({
-            error: `选定的节点 (ID: ${nodeId}) 未找到。\n\n可能的原因：\n1. 节点未正确部署 - 请点击"部署"按钮\n2. 节点配置有错误 - 请检查节点配置\n3. 节点ID已过期 - 请重新选择节点\n\n调试信息：\n当前可用节点: ${
+            error: `Selected node (ID: ${nodeId}) not found.\n\nPossible reasons:\n1. Node not properly deployed - please click "Deploy" button\n2. Node configuration has errors - please check node configuration\n3. Node ID expired - please reselect node\n\nDebug info:\nCurrent available nodes: ${
               allNodes.length
-            } 个\n${allNodes
+            }\n${allNodes
               .map(
                 (n) =>
-                  `- ${n.name} (配置ID: ${n.configId}, 运行时: ${
+                  `- ${n.name} (Config ID: ${n.configId}, Runtime: ${
                     n.runtimeExists ? "✓" : "✗"
                   })`
               )
@@ -939,7 +951,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
           });
         }
       } else {
-        // 查找第一个可用的运行时dev-copilot节点
+        // Find first available runtime dev-copilot node
         let foundNode = null;
         RED.nodes.eachNode(function (configNode) {
           if (configNode.type === "dev-copilot" && !foundNode) {
@@ -953,21 +965,21 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         if (!foundNode) {
           return res.status(404).json({
             error:
-              "未找到可用的Dev Copilot节点。请按以下步骤操作：\n\n1️⃣ 创建节点: 从左侧面板拖拽'dev copilot'节点到画布\n2️⃣ 配置节点: 双击节点配置LLM提供商和API密钥\n3️⃣ 部署节点: 点击右上角红色的'部署'按钮\n4️⃣ 刷新页面: 重新加载侧边栏\n5️⃣ 选择节点: 在上方下拉框中选择已部署的节点\n\n💡 提示：确保节点配置完整且已成功部署",
+              "No available Dev Copilot nodes found. Please follow these steps:\n\n1️⃣ Create node: Drag 'dev copilot' node from left panel to canvas\n2️⃣ Configure node: Double-click node to configure LLM provider and API key\n3️⃣ Deploy node: Click red 'Deploy' button in upper right\n4️⃣ Refresh page: Reload sidebar\n5️⃣ Select node: Choose deployed node from dropdown above\n\n💡 Tip: Ensure node configuration is complete and successfully deployed",
           });
         }
         node = foundNode;
-        console.log("   自动选择节点:", node.name || node.id);
+        console.log("   Auto-selected node:", node.name || node.id);
       }
 
-      // 检查节点配置
+      // Check node configuration
       if (!node.apiKey) {
         return res.status(400).json({
-          error: `节点配置不完整：缺少${node.provider}的API密钥。请双击节点进行配置。`,
+          error: `Node configuration incomplete: missing ${node.provider} API key. Please double-click node to configure.`,
         });
       }
 
-      // 构建消息
+      // Build messages
       const messages = [
         {
           role: "system",
@@ -984,7 +996,7 @@ Please provide clear, actionable advice and code examples when appropriate.`;
         content: message,
       });
 
-      // 调用 LLM
+      // Call LLM
       const response = await node.callLLM(messages);
 
       res.json({
@@ -1003,14 +1015,14 @@ Please provide clear, actionable advice and code examples when appropriate.`;
     }
   });
 
-  // API 端点：获取可用的 dev-copilot 节点
+  // API endpoint: get available dev-copilot nodes
   RED.httpAdmin.get("/dev-copilot/nodes", function (req, res) {
     const nodes = [];
 
-    // 获取运行时节点实例
+    // Get runtime node instances
     RED.nodes.eachNode(function (configNode) {
       if (configNode.type === "dev-copilot") {
-        // 查找对应的运行时节点实例
+        // Find corresponding runtime node instance
         const runtimeNode = RED.nodes.getNode(configNode.id);
         if (runtimeNode) {
           nodes.push({
@@ -1018,16 +1030,16 @@ Please provide clear, actionable advice and code examples when appropriate.`;
             name: runtimeNode.name || configNode.name || "Dev Copilot",
             provider: runtimeNode.provider || configNode.provider,
             model: runtimeNode.model || configNode.model,
-            status: "deployed", // 有运行时实例说明已部署
+            status: "deployed", // Has runtime instance means deployed
           });
         } else {
-          // 配置存在但未部署
+          // Configuration exists but not deployed
           nodes.push({
             id: configNode.id,
             name: configNode.name || "Dev Copilot",
             provider: configNode.provider,
             model: configNode.model,
-            status: "not_deployed", // 未部署
+            status: "not_deployed", // Not deployed
           });
         }
       }
