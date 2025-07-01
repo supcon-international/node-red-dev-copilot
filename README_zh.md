@@ -1,8 +1,9 @@
-# Node-RED Dev Copilot
+# Node-RED Dev Copilot (Cursor-Like)
 
 一个集成 AI 开发助手功能的 Node-RED 侧边栏插件，支持 MCP（Model Context Protocol）协议。
 
 ![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+[English](README.md)
 
 ## 功能特性
 
@@ -20,7 +21,7 @@
 - 🛠️ **开发专用**: 针对 Node-RED 和 JavaScript 开发优化的提示词
 - 🚀 **最新 SDK**: 使用最新官方 SDK，包括 Google Gen AI SDK v1.7+
 
-## 最新更新 (v1.2.0)
+## 最新更新 (v1.3.0)
 
 ### 核心 LLM 集成
 
@@ -38,9 +39,18 @@
 - ✅ **历史记录管理**: 添加清除按钮，轻松删除当前节点的聊天记录
 - ✅ **智能降级**: 优雅处理 localStorage 限制，提供备用存储策略
 
+### 代码质量与国际化
+
+- ✅ **完全英文代码库**: 所有中文注释和消息已翻译为英文，便于国际化协作
+- ✅ **统一代码风格**: 统一所有模块的编码规范（mcp-client.js、dev-copilot.js、dev-copilot.html、sidebar.html）
+- ✅ **增强可维护性**: 通过全面的英文文档提高代码可读性
+- ✅ **开发者体验**: 使用英文控制台日志和错误消息，提供更好的调试体验
+
 ## 安装
 
-### 通过 NPM 安装（推荐）
+### 通过 Node-RED 的 Manage palette 搜索 node-red-sidebar-dev-copilot 下载 （推荐）
+
+### 通过 NPM 安装
 
 ```bash
 cd ~/.node-red
@@ -76,12 +86,16 @@ npm install
 - **Provider**: 选择 AI 提供商（openai、google、deepseek）
 - **Model**: 指定模型名称（如：gpt-4、gemini-1.5-pro、deepseek-chat）
 - **API Key**: 输入对应提供商的 API 密钥（将安全存储）
+- **Temperature**: 控制随机性（0.0 = 确定性，2.0 = 非常创意）。编程任务建议使用 0.0-0.3
+- **Max Tokens**: 最大响应长度。编程任务：代码片段 1000-2000，复杂解决方案 3000-4000
+- **Tool Call Limit**: 工具调用最大轮数，防止无限循环。复杂任务使用 8-15
 
 #### MCP 服务器设置（可选）
 
-- **MCP Server Path**: MCP 服务器可执行文件路径
-- **MCP Server Args**: 服务器启动参数
-- **System Prompt**: 自定义系统提示词
+- **MCP Command**: MCP 服务器启动命令（default：npx @supcon-international/node-red-mcp-server）
+- **Arguments**: 可选的命令行参数，用空格分隔
+- **Environment Variables**: 可选的环境变量，格式：KEY=value，多个用逗号分隔
+- **System Prompt**: 自定义 AI 交互的系统提示词
 
 ### 3. 示例配置
 
@@ -91,6 +105,9 @@ npm install
 Provider: openai
 Model: gpt-4
 API Key: sk-...（你的OpenAI API密钥）
+Temperature: 0.1
+Max Tokens: 2000
+Tool Call Limit: 10
 ```
 
 #### DeepSeek 配置
@@ -99,6 +116,9 @@ API Key: sk-...（你的OpenAI API密钥）
 Provider: deepseek
 Model: deepseek-chat
 API Key: sk-...（你的DeepSeek API密钥）
+Temperature: 0.1
+Max Tokens: 2000
+Tool Call Limit: 10
 ```
 
 #### Google 配置
@@ -107,13 +127,17 @@ API Key: sk-...（你的DeepSeek API密钥）
 Provider: google
 Model: gemini-1.5-pro
 API Key: ...（你的Google API密钥）
+Temperature: 0.1
+Max Tokens: 2000
+Tool Call Limit: 10
 ```
 
 #### 使用 MCP 服务器
 
 ```
-MCP Server Path: npx
-MCP Server Args: @supcon-international/node-red-mcp-server
+MCP Command: npx @supcon-international/node-red-mcp-server
+Arguments: --port 3000 --verbose
+Environment Variables: API_KEY=xxx,DEBUG=true
 System Prompt: You are a Node-RED development assistant with MCP tools access.
 ```
 
@@ -186,15 +210,19 @@ npx @supcon-international/node-red-mcp-server
 
 ### 节点配置属性
 
-| 属性          | 类型        | 必填 | 描述           |
-| ------------- | ----------- | ---- | -------------- |
-| name          | string      | 否   | 节点显示名称   |
-| provider      | string      | 是   | LLM 提供商     |
-| model         | string      | 是   | 模型名称       |
-| apiKey        | credentials | 是   | API 密钥       |
-| mcpServerPath | string      | 否   | MCP 服务器路径 |
-| mcpServerArgs | string      | 否   | MCP 服务器参数 |
-| systemPrompt  | string      | 否   | 系统提示词     |
+| 属性          | 类型        | 必填 | 描述                                   |
+| ------------- | ----------- | ---- | -------------------------------------- |
+| name          | string      | 否   | 节点显示名称                           |
+| provider      | string      | 是   | LLM 提供商（openai、google、deepseek） |
+| model         | string      | 是   | 模型名称（如：gpt-4、gemini-1.5-pro）  |
+| apiKey        | credentials | 是   | 选定提供商的 API 密钥                  |
+| temperature   | number      | 是   | 控制随机性（0.0-2.0，默认：0.1）       |
+| maxTokens     | number      | 是   | 最大响应长度（100-8000，默认：2000）   |
+| toolCallLimit | number      | 是   | 工具调用最大轮数（1-20，默认：10）     |
+| mcpCommand    | string      | 否   | MCP 服务器启动命令                     |
+| mcpArgs       | string      | 否   | MCP 服务器命令行参数                   |
+| mcpEnv        | string      | 否   | 环境变量（KEY=value,KEY2=value2）      |
+| systemPrompt  | string      | 否   | 自定义 AI 交互的系统提示词             |
 
 ## 开发
 
@@ -240,10 +268,7 @@ npm link /path/to/node-red-sidebar-dev-copilot
 ### 测试 MCP 连接
 
 使用 MCP Inspector 测试服务器连接：
-
-```bash
-npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/server-filesystem .
-```
+https://github.com/modelcontextprotocol/inspector
 
 ## 故障排除
 

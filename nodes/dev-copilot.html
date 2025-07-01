@@ -22,7 +22,9 @@
         required: true,
         validate: RED.validators.number(),
       },
-      mcpCommand: { value: "" },
+      mcpCommand: {
+        value: "npx @supcon-international/node-red-mcp-server",
+      },
       mcpArgs: { value: "" },
       mcpEnv: { value: "" },
       systemPrompt: { value: "" },

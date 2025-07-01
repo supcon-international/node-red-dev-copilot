@@ -1,8 +1,9 @@
-# Node-RED Dev Copilot
+# Node-RED Dev Copilot（Cursor-Like）
 
 A Node-RED sidebar plugin integrating AI development assistant functionality with MCP (Model Context Protocol) support.
 
 ![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+[中文文档](README_zh.md)
 
 ## Features
 
@@ -20,7 +21,7 @@ A Node-RED sidebar plugin integrating AI development assistant functionality wit
 - 🛠️ **Development-Focused**: Optimized prompts for Node-RED and JavaScript development
 - 🚀 **Latest SDKs**: Uses latest official SDKs including Google Gen AI SDK v1.7+
 
-## Latest Updates (v1.2.0)
+## Latest Updates (v1.3.0)
 
 ### Core LLM Integration
 
@@ -38,9 +39,18 @@ A Node-RED sidebar plugin integrating AI development assistant functionality wit
 - ✅ **History Management**: Added clear button to easily delete chat history for current node
 - ✅ **Intelligent Fallback**: Gracefully handles localStorage limitations with fallback storage strategies
 
+### Code Quality & Internationalization
+
+- ✅ **Complete English Codebase**: All Chinese comments and messages have been translated to English for better international collaboration
+- ✅ **Consistent Code Style**: Unified coding standards across all modules (mcp-client.js, dev-copilot.js, dev-copilot.html, sidebar.html)
+- ✅ **Enhanced Maintainability**: Improved code readability with comprehensive English documentation
+- ✅ **Developer Experience**: Better debugging with English console logs and error messages
+
 ## Installation
 
-### Install via NPM (Recommended)
+### Download from NODE-RED Manage Palette directly (Recommended)
+
+### Install via NPM
 
 ```bash
 cd ~/.node-red
@@ -76,12 +86,16 @@ In the Node-RED editor:
 - **Provider**: Select AI provider (openai, google, deepseek)
 - **Model**: Specify model name (e.g., gpt-4, gemini-1.5-pro, deepseek-chat)
 - **API Key**: Enter the corresponding provider's API key (will be stored securely)
+- **Temperature**: Controls randomness (0.0 = deterministic, 2.0 = very creative). For coding tasks, use 0.0-0.3
+- **Max Tokens**: Maximum response length. For coding: 1000-2000 for snippets, 3000-4000 for complex solutions
+- **Tool Call Limit**: Maximum rounds of tool calls to prevent infinite loops. For complex tasks, use 8-15
 
 #### MCP Server Settings (Optional)
 
-- **MCP Server Path**: Path to MCP server executable
-- **MCP Server Args**: Server startup parameters
-- **System Prompt**: Custom system prompt
+- **MCP Command**: MCP server startup command (e.g., npx @supcon-international/node-red-mcp-server)
+- **Arguments**: Optional command line arguments, separated by spaces
+- **Environment Variables**: Optional environment variables, format: KEY=value, multiple separated by commas
+- **System Prompt**: Custom system prompt for AI interactions
 
 ### 3. Example Configurations
 
@@ -91,6 +105,9 @@ In the Node-RED editor:
 Provider: openai
 Model: gpt-4
 API Key: sk-...(your OpenAI API key)
+Temperature: 0.1
+Max Tokens: 2000
+Tool Call Limit: 10
 ```
 
 #### DeepSeek Configuration
@@ -99,6 +116,9 @@ API Key: sk-...(your OpenAI API key)
 Provider: deepseek
 Model: deepseek-chat
 API Key: sk-...(your DeepSeek API key)
+Temperature: 0.1
+Max Tokens: 2000
+Tool Call Limit: 10
 ```
 
 #### Google Configuration
@@ -107,13 +127,17 @@ API Key: sk-...(your DeepSeek API key)
 Provider: google
 Model: gemini-1.5-pro
 API Key: ...(your Google API key)
+Temperature: 0.1
+Max Tokens: 2000
+Tool Call Limit: 10
 ```
 
 #### Using MCP Server
 
 ```
-MCP Server Path: npx
-MCP Server Args: @supcon-international/node-red-mcp-server
+MCP Command: npx @supcon-international/node-red-mcp-server
+Arguments: --port 3000 --verbose
+Environment Variables: API_KEY=xxx,DEBUG=true
 System Prompt: You are a Node-RED development assistant with MCP tools access.
 ```
 
@@ -198,15 +222,19 @@ npx -y @modelcontextprotocol/server-puppeteer
 
 ### Node Configuration Properties
 
-| Property      | Type        | Required | Description           |
-| ------------- | ----------- | -------- | --------------------- |
-| name          | string      | No       | Node display name     |
-| provider      | string      | Yes      | LLM provider          |
-| model         | string      | Yes      | Model name            |
-| apiKey        | credentials | Yes      | API key               |
-| mcpServerPath | string      | No       | MCP server path       |
-| mcpServerArgs | string      | No       | MCP server parameters |
-| systemPrompt  | string      | No       | System prompt         |
+| Property      | Type        | Required | Description                                       |
+| ------------- | ----------- | -------- | ------------------------------------------------- |
+| name          | string      | No       | Node display name                                 |
+| provider      | string      | Yes      | LLM provider (openai, google, deepseek)           |
+| model         | string      | Yes      | Model name (e.g., gpt-4, gemini-1.5-pro)          |
+| apiKey        | credentials | Yes      | API key for the selected provider                 |
+| temperature   | number      | Yes      | Controls randomness (0.0-2.0, default: 0.1)       |
+| maxTokens     | number      | Yes      | Maximum response length (100-8000, default: 2000) |
+| toolCallLimit | number      | Yes      | Maximum tool call rounds (1-20, default: 10)      |
+| mcpCommand    | string      | No       | MCP server startup command                        |
+| mcpArgs       | string      | No       | MCP server command line arguments                 |
+| mcpEnv        | string      | No       | Environment variables (KEY=value,KEY2=value2)     |
+| systemPrompt  | string      | No       | Custom system prompt for AI interactions          |
 
 ## Development
 
@@ -252,10 +280,7 @@ npm link /path/to/node-red-sidebar-dev-copilot
 ### Testing MCP Connection
 
 Use MCP Inspector to test server connection:
-
-```bash
-npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/server-filesystem .
-```
+https://github.com/modelcontextprotocol/inspector
 
 ## Troubleshooting
 
@@ -316,10 +341,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Related Links
 
+- [SUPCON International](https://www.supcon.com/)
 - [Node-RED Official Website](https://nodered.org/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 - [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [SUPCON International](https://www.supcon.com/)
 
 ## Support
 
