@@ -1,6 +1,6 @@
 {
   "name": "@supcon-international/node-red-dev-copilot",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A Node-RED sidebar plugin that provides AI development copilot functionality with MCP support",
   "main": "nodes/dev-copilot.js",
   "scripts": {
@@ -17,8 +17,7 @@
   "author": "Zhou Xingyu <zhouxingyu@global.supcon.com>",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.30.1",
-    "@google/generative-ai": "^0.21.0",
+    "@google/genai": "^1.7.0",
     "@modelcontextprotocol/sdk": "^1.13.1",
     "axios": "^1.10.0",
     "openai": "^4.67.3",

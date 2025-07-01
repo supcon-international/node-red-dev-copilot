@@ -1,15 +1,9 @@
 const path = require("path");
-const MCPClientHelper = require(path.join(
-  __dirname,
-  "..",
-  "mcp",
-  "mcp-client.js"
-));
+const MCPClientHelper = require("../mcp/mcp-client.js");
 
 // Import official SDKs
 const OpenAI = require("openai");
-const Anthropic = require("@anthropic-ai/sdk");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 
 module.exports = function (RED) {
   "use strict";
@@ -55,14 +49,8 @@ module.exports = function (RED) {
               timeout: 30000,
             });
             break;
-          case "anthropic":
-            node.anthropicClient = new Anthropic({
-              apiKey: node.apiKey,
-              timeout: 30000,
-            });
-            break;
           case "google":
-            node.googleClient = new GoogleGenerativeAI(node.apiKey);
+            node.googleClient = new GoogleGenAI({ apiKey: node.apiKey });
             break;
           default:
             throw new Error(`Unsupported provider: ${node.provider}`);
@@ -275,8 +263,6 @@ module.exports = function (RED) {
           case "openai":
           case "deepseek":
             return await node.callOpenAIWithTools(messages, availableTools);
-          case "anthropic":
-            return await node.callAnthropicWithTools(messages, availableTools);
           case "google":
             return await node.callGoogleWithTools(messages, availableTools);
 
@@ -302,7 +288,7 @@ module.exports = function (RED) {
       }
     };
 
-    // OpenAI API call (with tool integration) - using official SDK
+    // OpenAI API call (with tool integration) - using official SDK with automatic function calling
     node.callOpenAIWithTools = async function (messages, tools) {
       if (!node.openaiClient) {
         throw new Error("OpenAI client not initialized");
@@ -312,19 +298,30 @@ module.exports = function (RED) {
       let finalContent = [];
       let lastResponse = null;
 
-      // Execute up to 5 rounds of tool calls to prevent infinite loops
-      for (let round = 0; round < 5; round++) {
+      // Execute up to configured rounds of tool calls to prevent infinite loops
+      const maxRounds = node.toolCallLimit || 10;
+      node.log(`🔄 Starting tool call loop - max rounds: ${maxRounds}`);
+
+      let round = 0;
+      let hitLimit = false;
+
+      for (round = 0; round < maxRounds; round++) {
         const requestParams = {
           model: node.model,
           messages: conversationMessages,
-          temperature: 0.7,
-          max_tokens: 2000,
+          temperature: node.temperature || 0.1,
+          max_tokens: node.maxTokens || 2000,
         };
 
-        // If tools are available, add them to the request
+        // If tools are available, add them to the request with automatic function calling
         if (tools && tools.length > 0) {
           requestParams.tools = tools;
-          requestParams.tool_choice = "auto";
+          requestParams.tool_choice = "auto"; // Enable automatic function calling
+          node.log(
+            `📤 OpenAI API request with ${tools.length} tools (automatic function calling enabled)`
+          );
+        } else {
+          node.log(`📤 OpenAI API simple call - no tools`);
         }
 
         const response = await node.openaiClient.chat.completions.create(
@@ -337,6 +334,12 @@ module.exports = function (RED) {
 
         // Check if there are tool calls
         if (message.tool_calls && message.tool_calls.length > 0) {
+          node.log(
+            `🔧 OpenAI API detected ${
+              message.tool_calls.length
+            } tool calls (round ${round + 1}/${maxRounds})`
+          );
+
           // Execute tool calls
           for (const toolCall of message.tool_calls) {
             const toolName = toolCall.function.name;
@@ -371,158 +374,15 @@ module.exports = function (RED) {
         }
       }
 
-      // Separate tool calls from final content
-      const toolCallsInfo = finalContent
-        .filter((line) => line.startsWith("🔧") || line.startsWith("❌"))
-        .join("\n\n");
-      const aiResponse = finalContent
-        .filter((line) => !line.startsWith("🔧") && !line.startsWith("❌"))
-        .join("\n\n");
-
-      // Combine tool calls info and AI response
-      const displayContent = toolCallsInfo
-        ? `${toolCallsInfo}\n\n${aiResponse}`
-        : aiResponse;
-
-      return {
-        content: displayContent,
-        usage: lastResponse ? lastResponse.usage : null,
-      };
-    };
-
-    // Anthropic API call (with tool integration) - using official SDK
-    node.callAnthropicWithTools = async function (messages, tools) {
-      if (!node.anthropicClient) {
-        throw new Error("Anthropic client not initialized");
-      }
-
-      const systemMessage = messages.find((m) => m.role === "system");
-      let conversationMessages = messages.filter((m) => m.role !== "system");
-      let finalContent = [];
-      let lastResponse = null;
-
-      // If no tools, use simple call
-      if (!tools || tools.length === 0) {
-        node.log(`📤 Anthropic API simple call - no tools`);
-
-        const requestParams = {
-          model: node.model,
-          messages: conversationMessages,
-          max_tokens: 2000,
-        };
-
-        if (systemMessage && systemMessage.content) {
-          requestParams.system = systemMessage.content;
-        }
-
-        const response = await node.anthropicClient.messages.create(
-          requestParams
+      // Check if we hit the tool call limit for OpenAI
+      if (round >= maxRounds) {
+        hitLimit = true;
+        node.warn(
+          `⚠️ OpenAI: Reached tool call limit (${maxRounds} rounds) - response may be incomplete`
         );
-        const textContent = response.content.filter(
-          (content) => content.type === "text"
+        finalContent.push(
+          `⚠️ Reached maximum tool calls (${maxRounds}), response may be incomplete`
         );
-        const content = textContent.map((t) => t.text).join("\n");
-
-        return {
-          content: content,
-          usage: response.usage || null,
-        };
-      }
-
-      // Convert tool format to Anthropic format
-      const anthropicTools = tools.map((tool) => ({
-        name: tool.function.name,
-        description: tool.function.description,
-        input_schema: tool.function.parameters,
-      }));
-
-      node.log(
-        `📤 Anthropic API request - messages: ${conversationMessages.length}, tools: ${anthropicTools.length}`
-      );
-
-      // Execute up to 5 rounds of tool calls to prevent infinite loops
-      for (let round = 0; round < 5; round++) {
-        const requestParams = {
-          model: node.model,
-          messages: conversationMessages,
-          max_tokens: 2000,
-          tools: anthropicTools,
-        };
-
-        if (systemMessage && systemMessage.content) {
-          requestParams.system = systemMessage.content;
-        }
-
-        const response = await node.anthropicClient.messages.create(
-          requestParams
-        );
-        lastResponse = response;
-
-        const responseContent = response.content;
-
-        // Check if there are tool calls in the response
-        const toolUses = responseContent.filter(
-          (content) => content.type === "tool_use"
-        );
-        const textContent = responseContent.filter(
-          (content) => content.type === "text"
-        );
-
-        // Add text content
-        if (textContent.length > 0) {
-          finalContent.push(textContent.map((t) => t.text).join("\n"));
-        }
-
-        if (toolUses.length > 0) {
-          // Add assistant message to conversation history
-          conversationMessages.push({
-            role: "assistant",
-            content: responseContent,
-          });
-
-          const toolResults = [];
-
-          // Execute tool calls
-          for (const toolUse of toolUses) {
-            const toolName = toolUse.name;
-            const toolArgs = toolUse.input;
-
-            finalContent.push(`🔧 Calling tool: ${toolName}`);
-
-            try {
-              const toolResult = await node.executeMCPTool(toolName, toolArgs);
-
-              // Format tool result
-              const formattedResult = node.formatToolResult(toolResult);
-
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: toolUse.id,
-                content: formattedResult,
-              });
-            } catch (error) {
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: toolUse.id,
-                content: `Error: ${error.message}`,
-              });
-
-              finalContent.push(`❌ Tool call failed: ${error.message}`);
-            }
-          }
-
-          // Add tool results to conversation
-          conversationMessages.push({
-            role: "user",
-            content: toolResults,
-          });
-
-          // Continue conversation, let Claude process tool results
-          continue;
-        } else {
-          // No tool calls, return final response
-          break;
-        }
       }
 
       // Separate tool calls from final content
@@ -544,7 +404,7 @@ module.exports = function (RED) {
       };
     };
 
-    // Google Gemini API call (with tool integration) - using official SDK
+    // Google Gemini API call (with tool integration) - using latest Gen AI SDK v1.7+
     node.callGoogleWithTools = async function (messages, tools) {
       if (!node.googleClient) {
         throw new Error("Google client not initialized");
@@ -554,208 +414,192 @@ module.exports = function (RED) {
       let conversationMessages = messages.filter((m) => m.role !== "system");
       let finalContent = [];
 
-      // Get model instance
-      const model = node.googleClient.getGenerativeModel({ model: node.model });
+      // Convert messages to Google format
+      const contents = conversationMessages.map((msg) => ({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content }],
+      }));
 
       // If no tools, use simple call
       if (!tools || tools.length === 0) {
         node.log(`📤 Google API simple call - no tools`);
 
-        // Build conversation history
-        const history = [];
-        for (let i = 0; i < conversationMessages.length - 1; i += 2) {
-          if (conversationMessages[i] && conversationMessages[i + 1]) {
-            history.push({
-              role: "user",
-              parts: [{ text: conversationMessages[i].content }],
-            });
-            history.push({
-              role: "model",
-              parts: [{ text: conversationMessages[i + 1].content }],
-            });
-          }
-        }
-
-        // Get the last user message
-        const lastMessage =
-          conversationMessages[conversationMessages.length - 1];
-        if (!lastMessage || lastMessage.role !== "user") {
-          throw new Error("Last message must be a user message");
-        }
-
-        const chat = model.startChat({
-          history: history,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2000,
-          },
-          systemInstruction: systemInstruction
-            ? systemInstruction.content
-            : undefined,
-        });
-
-        const result = await chat.sendMessage(lastMessage.content);
-        const response = await result.response;
-
-        return {
-          content: response.text(),
-          usage: response.usageMetadata || null,
-        };
-      }
-
-      // Implement Google SDK tool calling functionality
-      node.log(
-        `📤 Google API request - messages: ${conversationMessages.length}, tools: ${tools.length}`
-      );
-
-      // Clean JSON Schema to adapt to Google API
-      const cleanSchemaForGoogle = function (schema) {
-        if (!schema || typeof schema !== "object") return schema;
-
-        const cleaned = JSON.parse(JSON.stringify(schema)); // Deep copy
-
-        // Recursively clean object
-        function cleanObject(obj) {
-          if (typeof obj !== "object" || obj === null) return obj;
-
-          if (Array.isArray(obj)) {
-            return obj.map(cleanObject);
-          }
-
-          // Remove fields not supported by Google API
-          const unsupportedFields = [
-            "$schema",
-            "additionalProperties",
-            "$ref",
-            "definitions",
-            "$id",
-            "$comment",
-          ];
-          unsupportedFields.forEach((field) => {
-            delete obj[field];
+        try {
+          const response = await node.googleClient.models.generateContent({
+            model: node.model,
+            contents: contents,
+            config: {
+              temperature: node.temperature || 0.1,
+              maxOutputTokens: node.maxTokens || 2000,
+              systemInstruction: systemInstruction
+                ? systemInstruction.content
+                : undefined,
+            },
           });
 
-          // Recursively process all properties
-          for (const key in obj) {
-            obj[key] = cleanObject(obj[key]);
-          }
-
-          return obj;
+          return {
+            content: response.text,
+            usage: response.usageMetadata || null,
+          };
+        } catch (error) {
+          throw new Error(`Google API simple call failed: ${error.message}`);
         }
+      }
 
-        return cleanObject(cleaned);
-      };
-
-      // Convert tool format to Google format
-      const googleTools = tools.map((tool) => ({
+      // Convert tools to Google format (functionDeclarations)
+      const functionDeclarations = tools.map((tool) => ({
         name: tool.function.name,
         description: tool.function.description,
-        parameters: cleanSchemaForGoogle(tool.function.parameters),
+        parameters: tool.function.parameters,
       }));
 
-      // Create model instance with tools
-      const modelWithTools = node.googleClient.getGenerativeModel({
-        model: node.model,
-        tools: [{ functionDeclarations: googleTools }],
-        systemInstruction: systemInstruction
-          ? systemInstruction.content
-          : undefined,
-      });
+      node.log(
+        `📤 Google API request with tools - messages: ${conversationMessages.length}, tools: ${tools.length}`
+      );
 
       let lastResponse = null;
 
-      // Execute up to 5 rounds of tool calls
-      for (let round = 0; round < 5; round++) {
-        // Build current conversation history
-        const history = [];
-        for (let i = 0; i < conversationMessages.length - 1; i += 2) {
-          if (conversationMessages[i] && conversationMessages[i + 1]) {
-            history.push({
-              role: "user",
-              parts: [{ text: conversationMessages[i].content }],
-            });
-            history.push({
-              role: "model",
-              parts: [{ text: conversationMessages[i + 1].content }],
-            });
-          }
-        }
+      // Execute up to configured rounds of tool calls to prevent infinite loops
+      const maxRounds = node.toolCallLimit || 10;
+      node.log(`🔄 Starting Google tool call loop - max rounds: ${maxRounds}`);
 
-        const lastMessage =
-          conversationMessages[conversationMessages.length - 1];
-        if (!lastMessage || lastMessage.role !== "user") {
-          throw new Error("Last message must be a user message");
-        }
+      let round = 0;
+      let hitLimit = false;
 
-        const chat = modelWithTools.startChat({
-          history: history,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2000,
-          },
-        });
-
-        const result = await chat.sendMessage(lastMessage.content);
-        const response = await result.response;
-        lastResponse = response;
-
-        // Check if there are function calls
-        let functionCalls = [];
+      for (round = 0; round < maxRounds; round++) {
         try {
-          functionCalls = response.functionCalls() || [];
-        } catch (error) {
-          // If no function calls, an error will be thrown, which is normal
-          node.log("🔍 Google API: No function calls detected");
-          functionCalls = [];
-        }
+          // Use the latest Gen AI SDK config format
+          const config = {
+            tools: [{ functionDeclarations: functionDeclarations }],
+            temperature: node.temperature || 0.1,
+            maxOutputTokens: node.maxTokens || 2000,
+            systemInstruction: systemInstruction
+              ? systemInstruction.content
+              : undefined,
+          };
 
-        if (functionCalls && functionCalls.length > 0) {
-          // Has tool calls
-          node.log(`🔧 Google API detected ${functionCalls.length} tool calls`);
-
-          // Add model response to conversation history
-          const responseText = response.text() || "[Function calls]";
-          conversationMessages.push({
-            role: "assistant",
-            content: responseText,
+          const response = await node.googleClient.models.generateContent({
+            model: node.model,
+            contents: contents,
+            config: config,
           });
 
-          const functionResponses = [];
+          lastResponse = response;
 
-          for (const functionCall of functionCalls) {
-            const toolName = functionCall.name;
-            const toolArgs = functionCall.args;
-
-            finalContent.push(`🔧 Calling tool: ${toolName}`);
-
-            try {
-              const toolResult = await node.executeMCPTool(toolName, toolArgs);
-              const formattedResult = node.formatToolResult(toolResult);
-
-              functionResponses.push(
-                `Function ${toolName} result: ${formattedResult}`
-              );
-            } catch (error) {
-              functionResponses.push(
-                `Function ${toolName} error: ${error.message}`
-              );
-              finalContent.push(`❌ Tool call failed: ${error.message}`);
+          // Check if there are function calls in the response
+          let functionCalls = [];
+          try {
+            if (response.functionCalls && response.functionCalls.length > 0) {
+              functionCalls = response.functionCalls;
+            } else if (
+              response.candidates &&
+              response.candidates[0] &&
+              response.candidates[0].content
+            ) {
+              // Check for function calls in the content parts
+              const content = response.candidates[0].content;
+              if (content.parts) {
+                for (const part of content.parts) {
+                  if (part.functionCall) {
+                    functionCalls.push(part.functionCall);
+                  }
+                }
+              }
             }
+          } catch (error) {
+            node.log("🔍 Google API: No function calls detected");
+            functionCalls = [];
           }
 
-          // Send tool call results
-          const functionResponseMessage = functionResponses.join("\n\n");
-          conversationMessages.push({
-            role: "user",
-            content: functionResponseMessage,
-          });
+          if (functionCalls && functionCalls.length > 0) {
+            // Has tool calls
+            node.log(
+              `🔧 Google API detected ${
+                functionCalls.length
+              } tool calls (round ${round + 1}/${maxRounds})`
+            );
 
-          continue;
-        } else {
-          // No tool calls, return final response
-          finalContent.push(response.text());
-          break;
+            // Add model response to conversation
+            const modelContent = {
+              role: "model",
+              parts: [],
+            };
+
+            // Add text response if available
+            if (response.text) {
+              modelContent.parts.push({ text: response.text });
+            }
+
+            // Add function calls
+            for (const functionCall of functionCalls) {
+              modelContent.parts.push({ functionCall: functionCall });
+            }
+
+            contents.push(modelContent);
+
+            const functionResponses = [];
+
+            for (const functionCall of functionCalls) {
+              const toolName = functionCall.name;
+              const toolArgs =
+                functionCall.args || functionCall.arguments || {};
+
+              finalContent.push(`🔧 Calling tool: ${toolName}`);
+
+              try {
+                const toolResult = await node.executeMCPTool(
+                  toolName,
+                  toolArgs
+                );
+                const formattedResult = node.formatToolResult(toolResult);
+
+                functionResponses.push({
+                  functionResponse: {
+                    name: toolName,
+                    response: {
+                      result: formattedResult,
+                    },
+                  },
+                });
+              } catch (error) {
+                functionResponses.push({
+                  functionResponse: {
+                    name: toolName,
+                    response: {
+                      error: error.message,
+                    },
+                  },
+                });
+                finalContent.push(`❌ Tool call failed: ${error.message}`);
+              }
+            }
+
+            // Add tool results to conversation
+            contents.push({
+              role: "user",
+              parts: functionResponses,
+            });
+
+            continue;
+          } else {
+            // No tool calls, return final response
+            finalContent.push(response.text || "No response generated");
+            break;
+          }
+        } catch (error) {
+          throw new Error(`Google API call failed: ${error.message}`);
         }
+      }
+
+      // Check if we hit the tool call limit for Google API
+      if (round >= maxRounds) {
+        hitLimit = true;
+        node.warn(
+          `⚠️ Google: Reached tool call limit (${maxRounds} rounds) - response may be incomplete`
+        );
+        finalContent.push(
+          `⚠️ Reached maximum tool calls (${maxRounds}), response may be incomplete`
+        );
       }
 
       // Separate tool calls from final content
@@ -883,8 +727,7 @@ module.exports = function (RED) {
 
   // Register sidebar
   RED.httpAdmin.get("/dev-copilot/sidebar", function (req, res) {
-    const path = require("path");
-    const sidebarPath = path.join(__dirname, "..", "public", "sidebar.html");
+    const sidebarPath = path.join(__dirname, "../public/sidebar.html");
 
     // Check if file exists
     const fs = require("fs");

@@ -6,14 +6,24 @@ A Node-RED sidebar plugin integrating AI development assistant functionality wit
 
 ## Features
 
-- 🤖 **AI Development Assistant**: Integrates multiple LLM providers (OpenAI, Anthropic, Google, DeepSeek)
+- 🤖 **AI Development Assistant**: Integrates multiple LLM providers (OpenAI, Google, DeepSeek)
 - 🔧 **MCP Protocol Support**: Supports Model Context Protocol for automatic tool discovery and execution
 - 🎯 **Intelligent Tool Calling**: LLM automatically selects and executes tools based on requirements to get real-time data
+- ⚡ **Automatic Function Calling**: All supported LLMs use automatic function calling for seamless tool integration
 - 📱 **Sidebar UI**: Direct AI conversation within the Node-RED editor
 - ⚙️ **Flexible Configuration**: Support for multiple node configurations with different AI settings for different projects
 - 🔒 **Secure Credentials**: Uses Node-RED's credentials mechanism to securely store API keys
 - 💬 **Multi-turn Conversations**: Supports context-aware continuous dialogue and tool chain calls
 - 🛠️ **Development-Focused**: Optimized prompts for Node-RED and JavaScript development
+- 🚀 **Latest SDKs**: Uses latest official SDKs including Google Gen AI SDK v1.7+
+
+## Latest Updates (v1.2.0)
+
+- ✅ **Migrated to Google Gen AI SDK**: Updated from `@google/generative-ai` to `@google/genai@^1.7.0` following Google's official migration guide
+- ✅ **Fixed Google API Tool Calling**: Completely rewritten Google API integration with correct SDK formats and automatic function calling
+- ✅ **Automatic Function Calling**: Implemented automatic function calling for all LLM providers (OpenAI, Google, DeepSeek)
+- ✅ **Enhanced Tool Integration**: Improved tool calling with better error handling and logging
+- ✅ **Performance Optimization**: Faster and more reliable API calls using latest SDKs
 
 ## Installation
 
@@ -50,8 +60,8 @@ In the Node-RED editor:
 
 #### LLM Provider Settings
 
-- **Provider**: Select AI provider (openai, anthropic, google, deepseek)
-- **Model**: Specify model name (e.g., gpt-4, claude-3-5-sonnet-20241022, gemini-1.5-pro, deepseek-chat)
+- **Provider**: Select AI provider (openai, google, deepseek)
+- **Model**: Specify model name (e.g., gpt-4, gemini-1.5-pro, deepseek-chat)
 - **API Key**: Enter the corresponding provider's API key (will be stored securely)
 
 #### MCP Server Settings (Optional)
@@ -76,14 +86,6 @@ API Key: sk-...(your OpenAI API key)
 Provider: deepseek
 Model: deepseek-chat
 API Key: sk-...(your DeepSeek API key)
-```
-
-#### Anthropic Configuration
-
-```
-Provider: anthropic
-Model: claude-3-5-sonnet-20241022
-API Key: sk-ant-...(your Anthropic API key)
 ```
 
 #### Google Configuration

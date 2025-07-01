@@ -6,14 +6,24 @@
 
 ## 功能特性
 
-- 🤖 **AI 开发助手**: 集成多种 LLM 提供商（OpenAI、Anthropic、Google、DeepSeek）
+- 🤖 **AI 开发助手**: 集成多种 LLM 提供商（OpenAI、Google、DeepSeek）
 - 🔧 **MCP 协议支持**: 支持 Model Context Protocol，自动发现和调用 MCP 工具
 - 🎯 **智能工具调用**: LLM 根据需求自动选择和执行工具，获取实时数据
+- ⚡ **自动函数调用**: 所有支持的 LLM 都使用自动函数调用，实现无缝工具集成
 - 📱 **侧边栏 UI**: 直接在 Node-RED 编辑器中进行 AI 对话
 - ⚙️ **灵活配置**: 支持多节点配置，不同项目使用不同 AI 设置
 - 🔒 **安全凭证**: 使用 Node-RED 的 credentials 机制安全存储 API 密钥
 - 💬 **多轮对话**: 支持上下文感知的连续对话和工具链调用
 - 🛠️ **开发专用**: 针对 Node-RED 和 JavaScript 开发优化的提示词
+- 🚀 **最新 SDK**: 使用最新官方 SDK，包括 Google Gen AI SDK v1.7+
+
+## 最新更新 (v1.2.0)
+
+- ✅ **迁移到 Google Gen AI SDK**: 从 `@google/generative-ai` 更新到 `@google/genai@^1.7.0`，遵循 Google 官方迁移指南
+- ✅ **修复 Google API 工具调用**: 完全重写 Google API 集成，使用正确的 SDK 格式和自动函数调用
+- ✅ **自动函数调用**: 为所有 LLM 提供商（OpenAI、Google、DeepSeek）实现自动函数调用
+- ✅ **增强工具集成**: 改进工具调用，提供更好的错误处理和日志记录
+- ✅ **性能优化**: 使用最新 SDK 实现更快、更可靠的 API 调用
 
 ## 安装
 
@@ -50,8 +60,8 @@ npm install
 
 #### LLM 提供商设置
 
-- **Provider**: 选择 AI 提供商（openai、anthropic、google、deepseek）
-- **Model**: 指定模型名称（如：gpt-4、claude-3-5-sonnet-20241022、gemini-1.5-pro、deepseek-chat）
+- **Provider**: 选择 AI 提供商（openai、google、deepseek）
+- **Model**: 指定模型名称（如：gpt-4、gemini-1.5-pro、deepseek-chat）
 - **API Key**: 输入对应提供商的 API 密钥（将安全存储）
 
 #### MCP 服务器设置（可选）
@@ -76,14 +86,6 @@ API Key: sk-...（你的OpenAI API密钥）
 Provider: deepseek
 Model: deepseek-chat
 API Key: sk-...（你的DeepSeek API密钥）
-```
-
-#### Anthropic 配置
-
-```
-Provider: anthropic
-Model: claude-3-5-sonnet-20241022
-API Key: sk-ant-...（你的Anthropic API密钥）
 ```
 
 #### Google 配置

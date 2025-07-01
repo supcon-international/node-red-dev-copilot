@@ -6,8 +6,9 @@
 
 Node-RED Dev Copilot 现在支持：
 
-- ✅ **真实 LLM API 调用**：OpenAI、Anthropic、Google、DeepSeek
-- ✅ **官方 SDK 集成**：使用官方 SDK 替代直接 HTTP 请求，提供更好的稳定性
+- ✅ **真实 LLM API 调用**：OpenAI、Google、DeepSeek
+- ✅ **最新 SDK 集成**：使用最新官方 SDK，包括 Google Gen AI SDK v1.7+
+- ✅ **自动函数调用**：所有 LLM 提供商都支持自动函数调用，无需手动指定工具
 - ✅ **MCP 工具集成**：自动发现和使用 MCP 服务器提供的工具
 - ✅ **智能工具调用**：LLM 根据需求自动选择和执行工具
 - ✅ **多轮对话**：支持基于工具结果的连续对话
@@ -29,7 +30,7 @@ node-red
 
 1. 从节点面板的 "ai" 分类中拖拽 "dev copilot" 节点到流程
 2. 双击节点配置：
-   - **Provider**: 选择 LLM 提供商（OpenAI/Anthropic/Google/DeepSeek）
+   - **Provider**: 选择 LLM 提供商（OpenAI/Google/DeepSeek）
    - **Model**: 选择具体模型
    - **API Key**: 输入你的 API 密钥
    - **MCP Server Path**: 配置 MCP 服务器（可选）
@@ -246,7 +247,6 @@ node tests/test-mcp-llm-integration.js
 - [MCP 协议文档](https://modelcontextprotocol.io/)
 - [Node-RED 开发文档](https://nodered.org/docs/)
 - [OpenAI Function Calling](https://platform.openai.com/docs/guides/function-calling)
-- [Anthropic Tool Use](https://docs.anthropic.com/claude/docs/tool-use)
 
 ## 🎉 开始体验
 
@@ -260,11 +260,18 @@ node tests/test-mcp-llm-integration.js
 - "Calculate 123 + 456"
 - "Show me how to optimize this Node-RED flow"
 
-享受与 AI 助手的智能对话吧！🚀
+享受与 AI 助手的智能对话吧！
 
 ## 🆕 最新更新
 
-### V2.0 主要改进
+### V1.2.0 主要改进
+
+- ✅ **迁移到 Google Gen AI SDK**：从 `@google/generative-ai` 更新到 `@google/genai`，遵循 Google 官方迁移指南
+- ✅ **自动函数调用**：为所有 LLM 提供商（OpenAI、Google、DeepSeek）实现自动函数调用
+- ✅ **改进工具集成**：增强工具调用，提供更好的错误处理和日志记录
+- ✅ **性能优化**：使用最新 SDK 实现更快、更可靠的 API 调用
+
+### V2.0 之前的改进
 
 - ✅ **新增 DeepSeek 支持**：集成 DeepSeek API，提供强大的推理能力
 - ✅ **完全英文化**：所有界面、提示和错误信息都使用英文

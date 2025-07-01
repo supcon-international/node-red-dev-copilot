@@ -7,6 +7,21 @@
       name: { value: "" },
       provider: { value: "openai", required: true },
       model: { value: "gpt-4", required: true },
+      temperature: {
+        value: 0.1,
+        required: true,
+        validate: RED.validators.number(),
+      },
+      maxTokens: {
+        value: 2000,
+        required: true,
+        validate: RED.validators.number(),
+      },
+      toolCallLimit: {
+        value: 10,
+        required: true,
+        validate: RED.validators.number(),
+      },
       mcpCommand: { value: "" },
       mcpArgs: { value: "" },
       mcpEnv: { value: "" },
@@ -28,8 +43,6 @@
     oneditprepare: function () {
       const providerPlaceholders = {
         openai: "e.g.: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o, gpt-4o-mini",
-        anthropic:
-          "e.g.: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-haiku-20240307",
         google: "e.g.: gemini-1.5-pro, gemini-1.5-flash, gemini-pro",
         deepseek: "e.g.: deepseek-chat, deepseek-reasoner",
       };
@@ -67,7 +80,6 @@
     >
     <select id="node-input-provider">
       <option value="openai">OpenAI</option>
-      <option value="anthropic">Anthropic</option>
       <option value="google">Google</option>
       <option value="deepseek">DeepSeek</option>
     </select>
@@ -83,6 +95,63 @@
     <div class="form-tips">
       Enter the model name you want to use. Recommended models will be shown
       based on the Provider.
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-temperature"
+      ><i class="fa fa-thermometer-half"></i> Temperature</label
+    >
+    <input
+      type="number"
+      id="node-input-temperature"
+      placeholder="0.1"
+      min="0"
+      max="2"
+      step="0.1"
+      style="width: 100px;"
+    />
+    <div class="form-tips">
+      Controls randomness (0.0 = deterministic, 2.0 = very creative). For coding
+      tasks, use 0.0-0.3.
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-maxTokens"
+      ><i class="fa fa-file-text-o"></i> Max Tokens</label
+    >
+    <input
+      type="number"
+      id="node-input-maxTokens"
+      placeholder="2000"
+      min="100"
+      max="8000"
+      step="100"
+      style="width: 100px;"
+    />
+    <div class="form-tips">
+      Maximum response length. For coding: 1000-2000 for snippets, 3000-4000 for
+      complex solutions.
+    </div>
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-toolCallLimit"
+      ><i class="fa fa-repeat"></i> Tool Call Limit</label
+    >
+    <input
+      type="number"
+      id="node-input-toolCallLimit"
+      placeholder="10"
+      min="1"
+      max="20"
+      step="1"
+      style="width: 100px;"
+    />
+    <div class="form-tips">
+      Maximum rounds of tool calls to prevent infinite loops. For complex tasks,
+      use 8-15. For simple tasks, use 3-5.
     </div>
   </div>
 
@@ -151,12 +220,27 @@
   <h3>Configuration</h3>
   <dl class="message-properties">
     <dt>Provider <span class="property-type">string</span></dt>
-    <dd>The AI provider to use (OpenAI, Anthropic, Google, DeepSeek)</dd>
+    <dd>The AI provider to use (OpenAI, Google, DeepSeek)</dd>
 
     <dt>Model <span class="property-type">string</span></dt>
+    <dd>The specific model to use (e.g., gpt-4, gemini-1.5-pro)</dd>
+
+    <dt>Temperature <span class="property-type">number</span></dt>
     <dd>
-      The specific model to use (e.g., gpt-4, claude-3-5-sonnet-20241022,
-      gemini-1.5-pro)
+      Controls randomness (0.0 = deterministic, 2.0 = very creative). For coding
+      tasks, recommended range: 0.0-0.3
+    </dd>
+
+    <dt>Max Tokens <span class="property-type">number</span></dt>
+    <dd>
+      Maximum response length. For coding: 1000-2000 for snippets, 3000-4000 for
+      complex solutions
+    </dd>
+
+    <dt>Tool Call Limit <span class="property-type">number</span></dt>
+    <dd>
+      Maximum rounds of tool calls to prevent infinite loops. For complex
+      multi-step tasks, use 8-15. For simple tasks, use 3-5.
     </dd>
 
     <dt>API Key <span class="property-type">credentials</span></dt>
@@ -499,21 +583,28 @@
                 `
 🚀 Welcome to Dev Copilot!
 
-To get started, please follow these steps:
+Your AI-powered development assistant is ready to help with coding, debugging, and Node-RED development tasks.
 
-1️⃣ **Create Node**: Drag "dev copilot" node from the "ai" category in the left panel to the canvas
+**Quick Setup Guide:**
 
-2️⃣ **Configure Node**: Double-click the node to configure:
-   • Select LLM Provider (OpenAI/Anthropic/Google/DeepSeek)
-   • Enter the corresponding API key
-   • Choose the model to use
-   • (Optional) Configure MCP server
+1️⃣ **Create Node**: Drag "dev copilot" from the "AI dev copilot" category to your canvas
 
-3️⃣ **Deploy**: Click the red "Deploy" button in the upper right
+2️⃣ **Configure**: Double-click the node to set up:
+   • Choose Provider: OpenAI / Google / DeepSeek
+   • Enter your API key securely
+   • Select model (e.g., gpt-4, gemini-2.5-pro)
+   • Adjust Temperature (0.1 for coding) & Token limits
 
-4️⃣ **Select Node**: Choose the deployed node from the dropdown above
+3️⃣ **Deploy**: Click the red "Deploy" button
 
-Then you can start chatting with the AI assistant! 🎉
+4️⃣ **Select Node**: Choose your deployed node from the dropdown above
+
+**💡 Pro Tips:**
+• For enhanced capabilities, install our MCP server: \`@supcon-international/node-red-mcp-server\`
+• Use Temperature 0.1-0.3 for precise coding assistance  
+• Set Tool Call Limit to 10-15 for complex multi-step tasks
+
+Ready to dev smarter? Let's chat! 🎯
               `
               );
             } else {
@@ -525,20 +616,23 @@ Then you can start chatting with the AI assistant! 🎉
               addMessageToUI(
                 "warning",
                 `
-⚠️ Found ${undeployedNodes.length} undeployed nodes
+⚠️ **Deployment Required**
 
-Created nodes:
+Found ${undeployedNodes.length} undeployed nodes:
 ${undeployedNodes
-  .map((n) => `• ${n.name} (${n.provider} ${n.model})`)
+  .map((n) => `• ${n.name || "Unnamed"} (${n.provider} ${n.model})`)
   .join("\n")}
 
-🔧 To use these nodes, please:
-1️⃣ Check if node configuration is complete (double-click node to view)
-2️⃣ Click the red "Deploy" button in the upper right
-3️⃣ Wait for deployment to complete then refresh the page
-4️⃣ Reselect the node
+**Deployment Steps:**
+1️⃣ Verify node configuration (double-click nodes to check)
+2️⃣ Click the "Deploy" button (top-right)  
+3️⃣ Wait for deployment completion
+4️⃣ Refresh this page and reselect nodes
 
-💡 If deployment fails, please check console error messages and API key configuration.
+**Troubleshooting:**
+• Ensure API keys are correctly entered
+• Check browser console (F12) for error details
+• Verify model names are valid for your provider
               `
               );
             }
@@ -587,46 +681,62 @@ ${undeployedNodes
               addMessageToUI(
                 "info",
                 `
-✅ Node automatically selected: ${deployedNodes[0].name || "Unnamed node"} (${
+✅ Auto-Selected: ${deployedNodes[0].name || "Unnamed node"} (${
                   deployedNodes[0].provider
                 } ${deployedNodes[0].model})
 
-You can start chatting now! You can ask about:
-• 📝 Code writing and optimization suggestions
-• 🐛 Debugging and problem solving
-• 📚 Technical documentation and best practices
-• 🔧 Node-RED flow development help
+🎯 **Ready to assist with:**
+• Code writing & optimization
+• Debugging & problem-solving  
+• Technical documentation & best practices
+• Node-RED flow development
+• Architecture & design decisions
 
 ${
   deployedNodes[0].provider === "openai"
-    ? "💡 Tip: You're using OpenAI, which supports powerful code generation and analysis capabilities!"
+    ? "💡 **OpenAI Active**: Excellent for code generation, debugging, and complex reasoning tasks"
     : ""
 }
 ${
-  deployedNodes[0].provider === "anthropic"
-    ? "💡 Tip: You're using Anthropic Claude, which excels at detailed analysis and explanations!"
+  deployedNodes[0].provider === "google"
+    ? "💡 **Google Gemini Active**: Great for multi-modal analysis, reasoning, and coding assistance"
     : ""
 }
 ${
   deployedNodes[0].provider === "deepseek"
-    ? "💡 Tip: You're using DeepSeek, which provides excellent reasoning and coding assistance!"
+    ? "💡 **DeepSeek Active**: Powerful reasoning capabilities for complex development challenges"
     : ""
-}${warningMsg}
+}
+
+**Quick Start Examples:**
+• "Help me debug this JavaScript function..."
+• "Explain how Node-RED flows work"
+• "Write a function to validate user input"
+• "What's the best practice for error handling?"
+
+${warningMsg}
               `
               );
             } else if (deployedNodes.length > 1) {
               addMessageToUI(
                 "info",
                 `
-📋 Found ${
+📋 Multiple Nodes Available
+
+Found ${
                   deployedNodes.length
-                } available nodes, please select one from the dropdown above to start chatting.
+                } deployed nodes. Please select one from the dropdown above to start your AI-powered development session.
 
 ${
   undeployedNodes.length > 0
-    ? `⚠️ There are ${undeployedNodes.length} more nodes undeployed. If you need to use them, please deploy first.`
+    ? `⚠️ Note: ${undeployedNodes.length} additional nodes need deployment. Deploy them if you want to use different configurations.`
     : ""
 }
+
+**Tips for Node Selection:**
+• Different nodes can have different LLM providers and configurations
+• Switch between nodes to compare AI responses
+• Use specialized configurations for different project types
               `
               );
             }
@@ -637,10 +747,21 @@ ${
           nodeSelect.append('<option value="">Failed to load nodes</option>');
           addMessageToUI(
             "error",
-            `Unable to load available nodes, please check Node-RED connection status.
-          
-Error details: ${error || "Unknown error"}
-Status code: ${xhr.status || "N/A"}`
+            `🔌 **Connection Issue**
+
+Unable to load available nodes. Please check:
+
+**Immediate Actions:**
+• Refresh the browser page
+• Verify Node-RED is running
+• Check network connectivity
+
+**Technical Details:**
+• Error: ${error || "Unknown error"}
+• Status: ${xhr.status || "N/A"}
+• This usually indicates Node-RED service issues
+
+**Need Help?** Check Node-RED logs for more details.`
           );
         });
       }
