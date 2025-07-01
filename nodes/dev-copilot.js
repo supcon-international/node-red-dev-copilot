@@ -885,4 +885,162 @@ module.exports = function (RED) {
 
     res.json(nodes);
   });
+
+  // API endpoint: get context data
+  RED.httpAdmin.post("/dev-copilot/context/get", function (req, res) {
+    try {
+      const { key, nodeId } = req.body;
+
+      if (!key) {
+        return res.status(400).json({
+          success: false,
+          error: "Key is required",
+        });
+      }
+
+      // Find any dev-copilot node instance to access global context
+      let contextAccessNode = null;
+      RED.nodes.eachNode(function (configNode) {
+        if (configNode.type === "dev-copilot" && !contextAccessNode) {
+          const runtimeNode = RED.nodes.getNode(configNode.id);
+          if (runtimeNode) {
+            contextAccessNode = runtimeNode;
+          }
+        }
+      });
+
+      if (!contextAccessNode) {
+        return res.status(500).json({
+          success: false,
+          error: "No dev-copilot node available for context access",
+        });
+      }
+
+      // Use the node's context to access configured storage (localfilesystem)
+      const data = contextAccessNode.context().global.get(key) || null;
+
+      console.log(
+        `📖 Retrieved context data: ${key} = ${
+          data ? typeof data : "null"
+        } (using ${
+          RED.settings.contextStorage?.default?.module || "memory"
+        } storage)`
+      );
+
+      res.json({
+        success: true,
+        data: data,
+      });
+    } catch (error) {
+      console.error("❌ Failed to get context data:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // API endpoint: set context data
+  RED.httpAdmin.post("/dev-copilot/context/set", function (req, res) {
+    try {
+      const { key, data, nodeId } = req.body;
+
+      if (!key) {
+        return res.status(400).json({
+          success: false,
+          error: "Key is required",
+        });
+      }
+
+      // Find any dev-copilot node instance to access global context
+      let contextAccessNode = null;
+      RED.nodes.eachNode(function (configNode) {
+        if (configNode.type === "dev-copilot" && !contextAccessNode) {
+          const runtimeNode = RED.nodes.getNode(configNode.id);
+          if (runtimeNode) {
+            contextAccessNode = runtimeNode;
+          }
+        }
+      });
+
+      if (!contextAccessNode) {
+        return res.status(500).json({
+          success: false,
+          error: "No dev-copilot node available for context access",
+        });
+      }
+
+      // Use the node's context to save to configured storage (localfilesystem)
+      contextAccessNode.context().global.set(key, data);
+
+      console.log(
+        `💾 Context data saved: ${key} (${data ? typeof data : "null"}) to ${
+          RED.settings.contextStorage?.default?.module || "memory"
+        } storage`
+      );
+
+      res.json({
+        success: true,
+        message: "Context data saved successfully",
+      });
+    } catch (error) {
+      console.error("❌ Failed to set context data:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // API endpoint: delete context data
+  RED.httpAdmin.post("/dev-copilot/context/delete", function (req, res) {
+    try {
+      const { key, nodeId } = req.body;
+
+      if (!key) {
+        return res.status(400).json({
+          success: false,
+          error: "Key is required",
+        });
+      }
+
+      // Find any dev-copilot node instance to access global context
+      let contextAccessNode = null;
+      RED.nodes.eachNode(function (configNode) {
+        if (configNode.type === "dev-copilot" && !contextAccessNode) {
+          const runtimeNode = RED.nodes.getNode(configNode.id);
+          if (runtimeNode) {
+            contextAccessNode = runtimeNode;
+          }
+        }
+      });
+
+      if (!contextAccessNode) {
+        return res.status(500).json({
+          success: false,
+          error: "No dev-copilot node available for context access",
+        });
+      }
+
+      // Use the node's context to delete from configured storage (localfilesystem)
+      contextAccessNode.context().global.set(key, undefined);
+
+      console.log(
+        `🗑️ Context data deleted: ${key} from ${
+          RED.settings.contextStorage?.default?.module || "memory"
+        } storage`
+      );
+
+      res.json({
+        success: true,
+        message: "Context data deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Failed to delete context data:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  });
 };

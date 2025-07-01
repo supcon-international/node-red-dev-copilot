@@ -21,7 +21,7 @@
 - 🛠️ **开发专用**: 针对 Node-RED 和 JavaScript 开发优化的提示词
 - 🚀 **最新 SDK**: 使用最新官方 SDK，包括 Google Gen AI SDK v1.7+
 
-## 最新更新 (v1.3.0)
+## 最新更新 (v1.4.0)
 
 ### 核心 LLM 集成
 
@@ -33,11 +33,11 @@
 
 ### 用户体验增强
 
-- ✅ **消息持久化**: 聊天记录现在自动保存到 localStorage，页面刷新后不丢失
-- ✅ **智能节点选择**: 自动记住并在页面重新加载时恢复上次选择的节点
+- ✅ **消息持久化**: 聊天记录现在自动保存到 Node-RED context 存储，服务重启后不丢失
+- ✅ **智能节点选择**: 使用持久化 context 自动记住并在页面重新加载时恢复上次选择的节点
 - ✅ **静默恢复**: 无缝恢复对话状态，不显示冗余的欢迎信息
 - ✅ **历史记录管理**: 添加清除按钮，轻松删除当前节点的聊天记录
-- ✅ **智能降级**: 优雅处理 localStorage 限制，提供备用存储策略
+- ✅ **Context 存储**: 使用 Node-RED 内置 context 存储替代 localStorage，无容量限制且跨浏览器同步
 
 ### 代码质量与国际化
 
@@ -294,10 +294,10 @@ https://github.com/modelcontextprotocol/inspector
    - 检查 API 配额是否充足
 
 4. **聊天记录未保存**
-   - 检查浏览器是否启用了 localStorage
-   - 确认未使用隐私/无痕模式（数据在会话结束时清除）
-   - 如果 localStorage 损坏，清除浏览器缓存
-   - 检查浏览器存储配额（通常 5-10MB 限制）
+   - 验证 Node-RED context 存储是否正确配置
+   - 检查 Node-RED settings.js 中是否启用了 contextStorage
+   - 确保 Node-RED 对数据目录有写权限
+   - 查看 Node-RED 日志中的 context 存储错误
 
 ### 调试日志
 

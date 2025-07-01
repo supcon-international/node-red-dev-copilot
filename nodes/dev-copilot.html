@@ -45,7 +45,7 @@
     oneditprepare: function () {
       const providerPlaceholders = {
         openai: "e.g.: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o, gpt-4o-mini",
-        google: "e.g.: gemini-1.5-pro, gemini-1.5-flash, gemini-pro",
+        google: "e.g.: gemini-2.5-pro, gemini-2.5-flash, gemini-pro",
         deepseek: "e.g.: deepseek-chat, deepseek-reasoner",
       };
 
@@ -411,24 +411,70 @@
       let messageHistory = [];
       let currentNodeId = null;
 
-      // Message persistence functionality
-      const STORAGE_KEY_PREFIX = "dev-copilot-messages-";
-      const SELECTED_NODE_KEY = "dev-copilot-selected-node"; // Save selected node ID
+      // Message persistence functionality - Using Node-RED context storage (localfilesystem) instead of localStorage
+      const CONTEXT_KEY_PREFIX = "dev-copilot-messages-";
+      const SELECTED_NODE_CONTEXT_KEY = "dev-copilot-selected-node";
       const MAX_HISTORY_LENGTH = 50; // Limit each node to save 50 messages
 
-      // Load message history from localStorage for a specific node
-      function loadMessageHistory(nodeId) {
+      // Context storage helper functions
+      async function getContextData(key, nodeId = null) {
+        try {
+          const response = await $.ajax({
+            url: "/dev-copilot/context/get",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ key, nodeId }),
+          });
+          return response.success ? response.data : null;
+        } catch (error) {
+          console.warn("Failed to get context data:", error);
+          return null;
+        }
+      }
+
+      async function setContextData(key, data, nodeId = null) {
+        try {
+          const response = await $.ajax({
+            url: "/dev-copilot/context/set",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ key, data, nodeId }),
+          });
+          return response.success;
+        } catch (error) {
+          console.warn("Failed to set context data:", error);
+          return false;
+        }
+      }
+
+      async function deleteContextData(key, nodeId = null) {
+        try {
+          const response = await $.ajax({
+            url: "/dev-copilot/context/delete",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ key, nodeId }),
+          });
+          return response.success;
+        } catch (error) {
+          console.warn("Failed to delete context data:", error);
+          return false;
+        }
+      }
+
+      // Load message history from Node-RED context storage for a specific node
+      async function loadMessageHistory(nodeId) {
         if (!nodeId) return [];
 
         try {
-          const storageKey = STORAGE_KEY_PREFIX + nodeId;
-          const stored = localStorage.getItem(storageKey);
-          if (stored) {
-            const parsed = JSON.parse(stored);
+          const contextKey = CONTEXT_KEY_PREFIX + nodeId;
+          const stored = await getContextData(contextKey, nodeId);
+
+          if (stored && Array.isArray(stored)) {
             console.log(
-              `📖 Loading ${parsed.length} message history from localStorage (node: ${nodeId})`
+              `📖 Loading ${stored.length} message history from Node-RED context storage (node: ${nodeId})`
             );
-            return Array.isArray(parsed) ? parsed : [];
+            return stored;
           }
         } catch (error) {
           console.warn("Failed to load message history:", error);
@@ -436,48 +482,42 @@
         return [];
       }
 
-      // Save message history for a specific node to localStorage
-      function saveMessageHistory(nodeId, history) {
-        if (!nodeId || !Array.isArray(history)) return;
+      // Save message history for a specific node to Node-RED context storage
+      async function saveMessageHistory(nodeId, history) {
+        if (!nodeId || !Array.isArray(history)) return false;
 
         try {
-          const storageKey = STORAGE_KEY_PREFIX + nodeId;
-          // Limit history length to avoid localStorage becoming too large
+          const contextKey = CONTEXT_KEY_PREFIX + nodeId;
+          // Limit history length to avoid context storage becoming too large
           const trimmedHistory = history.slice(-MAX_HISTORY_LENGTH);
-          localStorage.setItem(storageKey, JSON.stringify(trimmedHistory));
-          console.log(
-            `💾 Saving ${trimmedHistory.length} messages to localStorage (node: ${nodeId})`
+
+          const success = await setContextData(
+            contextKey,
+            trimmedHistory,
+            nodeId
           );
+          if (success) {
+            console.log(
+              `💾 Saving ${trimmedHistory.length} messages to Node-RED context storage (node: ${nodeId})`
+            );
+          }
+          return success;
         } catch (error) {
           console.warn("Failed to save message history:", error);
-          // If storage space is insufficient, clean old data and retry
-          if (error.name === "QuotaExceededError") {
-            cleanupOldMessageHistory();
-            try {
-              localStorage.setItem(
-                storageKey,
-                JSON.stringify(history.slice(-MAX_HISTORY_LENGTH))
-              );
-            } catch (retryError) {
-              console.error("Failed to save message history:", retryError);
-            }
-          }
+          return false;
         }
       }
 
-      // Clean old message history (keep recently used)
-      function cleanupOldMessageHistory() {
+      // Clean old message history (keep recently used) - simplified for context
+      async function cleanupOldMessageHistory() {
         try {
-          const keys = Object.keys(localStorage).filter((key) =>
-            key.startsWith(STORAGE_KEY_PREFIX)
-          );
-          console.log(`🧹 Cleaning ${keys.length} old message histories`);
-
-          // Simple strategy: delete half of the old data
-          const keysToDelete = keys.slice(0, Math.floor(keys.length / 2));
-          keysToDelete.forEach((key) => localStorage.removeItem(key));
+          console.log("🧹 Context cleanup handled by Node-RED storage system");
+          // Note: Node-RED context with localfilesystem handles cleanup automatically
+          // Manual cleanup not needed unless storage quota is reached
+          return true;
         } catch (error) {
           console.warn("Failed to clean message history:", error);
+          return false;
         }
       }
 
@@ -505,35 +545,45 @@
       }
 
       // Add message and persist
-      function addMessageAndSave(role, content) {
+      async function addMessageAndSave(role, content) {
         messageHistory.push({ role, content });
 
-        // Save immediately to localStorage
+        // Save immediately to Node-RED context storage
         if (currentNodeId) {
-          saveMessageHistory(currentNodeId, messageHistory);
+          await saveMessageHistory(currentNodeId, messageHistory);
         }
       }
 
-      // Save selected node ID
-      function saveSelectedNode(nodeId) {
+      // Save selected node ID to Node-RED context storage
+      async function saveSelectedNode(nodeId) {
         try {
-          if (nodeId) {
-            localStorage.setItem(SELECTED_NODE_KEY, nodeId);
-            console.log(`💾 Saving selected node: ${nodeId}`);
-          } else {
-            localStorage.removeItem(SELECTED_NODE_KEY);
-            console.log(`🗑️ Clearing selected node record`);
+          const success = await setContextData(
+            SELECTED_NODE_CONTEXT_KEY,
+            nodeId
+          );
+          if (success) {
+            console.log(
+              `💾 Saving selected node to Node-RED context storage: ${
+                nodeId || "null"
+              }`
+            );
           }
+          return success;
         } catch (error) {
           console.warn("Failed to save selected node:", error);
+          return false;
         }
       }
 
-      // Load last selected node ID
-      function loadSelectedNode() {
+      // Load last selected node ID from Node-RED context storage
+      async function loadSelectedNode() {
         try {
-          const nodeId = localStorage.getItem(SELECTED_NODE_KEY);
-          console.log(`📖 Loading last selected node: ${nodeId || "None"}`);
+          const nodeId = await getContextData(SELECTED_NODE_CONTEXT_KEY);
+          console.log(
+            `📖 Loading last selected node from Node-RED context storage: ${
+              nodeId || "None"
+            }`
+          );
           return nodeId;
         } catch (error) {
           console.warn("Failed to load selected node:", error);
@@ -542,7 +592,7 @@
       }
 
       // Clear current node's history
-      function clearCurrentNodeHistory() {
+      async function clearCurrentNodeHistory() {
         if (!currentNodeId) {
           RED.notify("Please select a node first", "warning");
           return;
@@ -559,11 +609,15 @@
             '<div class="dev-copilot-empty-state">Chat history cleared<br><small>Start a new conversation!</small></div>'
           );
 
-          // Remove from localStorage
-          const storageKey = STORAGE_KEY_PREFIX + currentNodeId;
-          localStorage.removeItem(storageKey);
-          console.log(`🗑️ Clearing all history for node ${currentNodeId}`);
-          RED.notify("Chat history cleared", "success");
+          // Remove from Node-RED context storage
+          const contextKey = CONTEXT_KEY_PREFIX + currentNodeId;
+          const success = await deleteContextData(contextKey, currentNodeId);
+          console.log(
+            `🗑️ Clearing all history for node ${currentNodeId}: ${
+              success ? "success" : "failed"
+            }`
+          );
+          RED.notify("Chat history cleared", success ? "success" : "error");
         }
       }
 
@@ -589,7 +643,7 @@
 
         // Add user message to interface and save
         addMessageToUI("user", message);
-        addMessageAndSave("user", message); // Use new save function
+        addMessageAndSave("user", message); // Use new save function (async)
 
         // Clear input box
         messageInput.val("");
@@ -613,7 +667,7 @@
 
             if (response.success) {
               addMessageToUI("assistant", response.response);
-              addMessageAndSave("assistant", response.response); // Save AI response
+              addMessageAndSave("assistant", response.response); // Save AI response (async)
             } else {
               addMessageToUI("error", "Error: " + response.error);
             }
@@ -736,31 +790,31 @@
               addMessageToUI(
                 "info",
                 `
-🚀 Welcome to Dev Copilot!
+  🚀 Welcome to Dev Copilot!
 
-Your AI-powered development assistant is ready to help with coding, debugging, and Node-RED development tasks.
+  Your AI-powered development assistant is ready to help with coding, debugging, and Node-RED development tasks.
 
-**Quick Setup Guide:**
+  **Quick Setup Guide:**
 
-1️⃣ **Create Node**: Drag "dev copilot" from the "AI dev copilot" category to your canvas
+  1️⃣ **Create Node**: Drag "dev copilot" from the "AI dev copilot" category to your canvas
 
-2️⃣ **Configure**: Double-click the node to set up:
-   • Choose Provider: OpenAI / Google / DeepSeek
-   • Enter your API key securely
-   • Select model (e.g., gpt-4, gemini-2.5-pro)
-   • Adjust Temperature (0.1 for coding) & Token limits
+  2️⃣ **Configure**: Double-click the node to set up:
+     • Choose Provider: OpenAI / Google / DeepSeek
+     • Enter your API key securely
+     • Select model (e.g., gpt-4, gemini-2.5-pro)
+     • Adjust Temperature (0.1 for coding) & Token limits
 
-3️⃣ **Deploy**: Click the red "Deploy" button
+  3️⃣ **Deploy**: Click the red "Deploy" button
 
-4️⃣ **Select Node**: Choose your deployed node from the dropdown above
+  4️⃣ **Select Node**: Choose your deployed node from the dropdown above
 
-**💡 Pro Tips:**
-• For enhanced capabilities, install our MCP server: \`@supcon-international/node-red-mcp-server\`
-• Use Temperature 0.1-0.3 for precise coding assistance  
-• Set Tool Call Limit to 10-15 for complex multi-step tasks
+  **💡 Pro Tips:**
+  • For enhanced capabilities, install our MCP server: \`@supcon-international/node-red-mcp-server\`
+  • Use Temperature 0.1-0.3 for precise coding assistance
+  • Set Tool Call Limit to 10-15 for complex multi-step tasks
 
-Ready to dev smarter? Let's chat! 🎯
-              `
+  Ready to dev smarter? Let's chat! 🎯
+                `
               );
             } else {
               // Has nodes but all undeployed
@@ -771,24 +825,24 @@ Ready to dev smarter? Let's chat! 🎯
               addMessageToUI(
                 "warning",
                 `
-⚠️ **Deployment Required**
+  ⚠️ **Deployment Required**
 
-Found ${undeployedNodes.length} undeployed nodes:
-${undeployedNodes
-  .map((n) => `• ${n.name || "Unnamed"} (${n.provider} ${n.model})`)
-  .join("\n")}
+  Found ${undeployedNodes.length} undeployed nodes:
+  ${undeployedNodes
+    .map((n) => `• ${n.name || "Unnamed"} (${n.provider} ${n.model})`)
+    .join("\n")}
 
-**Deployment Steps:**
-1️⃣ Verify node configuration (double-click nodes to check)
-2️⃣ Click the "Deploy" button (top-right)  
-3️⃣ Wait for deployment completion
-4️⃣ Refresh this page and reselect nodes
+  **Deployment Steps:**
+  1️⃣ Verify node configuration (double-click nodes to check)
+  2️⃣ Click the "Deploy" button (top-right)
+  3️⃣ Wait for deployment completion
+  4️⃣ Refresh this page and reselect nodes
 
-**Troubleshooting:**
-• Ensure API keys are correctly entered
-• Check browser console (F12) for error details
-• Verify model names are valid for your provider
-              `
+  **Troubleshooting:**
+  • Ensure API keys are correctly entered
+  • Check browser console (F12) for error details
+  • Verify model names are valid for your provider
+                `
               );
             }
           } else {
@@ -823,90 +877,95 @@ ${undeployedNodes
               });
             }
 
-            // Smart node selection logic
-            const lastSelectedNodeId = loadSelectedNode();
-            let selectedNodeId = null;
-            let selectedNode = null;
-            let selectionReason = "";
+            // Smart node selection logic (async)
+            (async () => {
+              const lastSelectedNodeId = await loadSelectedNode();
+              let selectedNodeId = null;
+              let selectedNode = null;
+              let selectionReason = "";
 
-            // 1. First try to restore previously selected node
-            if (lastSelectedNodeId) {
-              const foundNode = deployedNodes.find(
-                (node) => node.id === lastSelectedNodeId
-              );
-              if (foundNode) {
-                selectedNodeId = lastSelectedNodeId;
-                selectedNode = foundNode;
-                selectionReason = "Restored previous selection";
-                console.log(
-                  `🔄 Restoring previously selected node: ${selectedNodeId}`
+              // 1. First try to restore previously selected node
+              if (lastSelectedNodeId) {
+                const foundNode = deployedNodes.find(
+                  (node) => node.id === lastSelectedNodeId
                 );
-              } else {
+                if (foundNode) {
+                  selectedNodeId = lastSelectedNodeId;
+                  selectedNode = foundNode;
+                  selectionReason = "Restored previous selection";
+                  console.log(
+                    `🔄 Restoring previously selected node: ${selectedNodeId}`
+                  );
+                } else {
+                  console.log(
+                    `⚠️ Previously selected node ${lastSelectedNodeId} is no longer available, selecting first available node`
+                  );
+                }
+              }
+
+              // 2. If no previous selection or previous node unavailable, select first available node
+              if (!selectedNodeId && deployedNodes.length > 0) {
+                selectedNodeId = deployedNodes[0].id;
+                selectedNode = deployedNodes[0];
+                selectionReason =
+                  deployedNodes.length === 1
+                    ? "Only available node"
+                    : "Default first selection";
+                console.log(`🎯 ${selectionReason}: ${selectedNodeId}`);
+              }
+
+              // 3. Execute node selection
+              if (selectedNodeId && selectedNode) {
+                nodeSelect.val(selectedNodeId);
+                currentNodeId = selectedNodeId;
+                await saveSelectedNode(selectedNodeId);
+
+                // Immediately load message history for this node
+                messageHistory = await loadMessageHistory(selectedNodeId);
+                restoreMessagesToUI(messageHistory);
+
+                // Silent recovery: only show simple prompt when no history exists
+                if (messageHistory.length === 0) {
+                  addMessageToUI(
+                    "info",
+                    `✅ **${selectionReason}**: ${
+                      selectedNode.name || "Unnamed node"
+                    } (${selectedNode.provider} ${
+                      selectedNode.model
+                    })\n\n💬 Start chatting!`
+                  );
+                }
+                // If there is history, don't show any prompt messages, let user see chat history directly
+
                 console.log(
-                  `⚠️ Previously selected node ${lastSelectedNodeId} is no longer available, selecting first available node`
+                  `🎯 Node selection completed: ${selectedNode.name} (${selectedNode.provider} ${selectedNode.model}), history: ${messageHistory.length} messages`
                 );
               }
-            }
+            })();
 
-            // 2. If no previous selection or previous node unavailable, select first available node
-            if (!selectedNodeId && deployedNodes.length > 0) {
-              selectedNodeId = deployedNodes[0].id;
-              selectedNode = deployedNodes[0];
-              selectionReason =
-                deployedNodes.length === 1
-                  ? "Only available node"
-                  : "Default first selection";
-              console.log(`🎯 ${selectionReason}: ${selectedNodeId}`);
-            }
-
-            // 3. Execute node selection
-            if (selectedNodeId && selectedNode) {
-              nodeSelect.val(selectedNodeId);
-              currentNodeId = selectedNodeId;
-              saveSelectedNode(selectedNodeId);
-
-              // Immediately load message history for this node
-              messageHistory = loadMessageHistory(selectedNodeId);
-              restoreMessagesToUI(messageHistory);
-
-              // Silent recovery: only show simple prompt when no history exists
-              if (messageHistory.length === 0) {
-                addMessageToUI(
-                  "info",
-                  `✅ **${selectionReason}**: ${
-                    selectedNode.name || "Unnamed node"
-                  } (${selectedNode.provider} ${
-                    selectedNode.model
-                  })\n\n💬 Start chatting!`
-                );
-              }
-              // If there is history, don't show any prompt messages, let user see chat history directly
-
-              console.log(
-                `🎯 Node selection completed: ${selectedNode.name} (${selectedNode.provider} ${selectedNode.model}), history: ${messageHistory.length} messages`
-              );
-            } else if (deployedNodes.length > 1) {
+            // Handle case with multiple nodes but auto-selection failed
+            if (deployedNodes.length > 1) {
               // If auto-selection failed for some reason, show multi-node prompt
               addMessageToUI(
                 "info",
                 `
-📋 Multiple Nodes Available
+  📋 Multiple Nodes Available
 
-Found ${
-                  deployedNodes.length
-                } deployed nodes. Please select one from the dropdown above to start your AI-powered development session.
+  Found ${
+    deployedNodes.length
+  } deployed nodes. Please select one from the dropdown above to start your AI-powered development session.
 
-${
-  undeployedNodes.length > 0
-    ? `⚠️ Note: ${undeployedNodes.length} additional nodes need deployment. Deploy them if you want to use different configurations.`
-    : ""
-}
+  ${
+    undeployedNodes.length > 0
+      ? `⚠️ Note: ${undeployedNodes.length} additional nodes need deployment. Deploy them if you want to use different configurations.`
+      : ""
+  }
 
-**Tips for Node Selection:**
-• Different nodes can have different LLM providers and configurations
-• Switch between nodes to compare AI responses
-• Use specialized configurations for different project types
-              `
+  **Tips for Node Selection:**
+  • Different nodes can have different LLM providers and configurations
+  • Switch between nodes to compare AI responses
+  • Use specialized configurations for different project types
+                `
               );
             }
           }
@@ -918,19 +977,19 @@ ${
             "error",
             `🔌 **Connection Issue**
 
-Unable to load available nodes. Please check:
+  Unable to load available nodes. Please check:
 
-**Immediate Actions:**
-• Refresh the browser page
-• Verify Node-RED is running
-• Check network connectivity
+  **Immediate Actions:**
+  • Refresh the browser page
+  • Verify Node-RED is running
+  • Check network connectivity
 
-**Technical Details:**
-• Error: ${error || "Unknown error"}
-• Status: ${xhr.status || "N/A"}
-• This usually indicates Node-RED service issues
+  **Technical Details:**
+  • Error: ${error || "Unknown error"}
+  • Status: ${xhr.status || "N/A"}
+  • This usually indicates Node-RED service issues
 
-**Need Help?** Check Node-RED logs for more details.`
+  **Need Help?** Check Node-RED logs for more details.`
           );
         });
       }
@@ -944,31 +1003,31 @@ Unable to load available nodes. Please check:
         }
       });
 
-      nodeSelect.on("change", function () {
+      nodeSelect.on("change", async function () {
         const newNodeId = $(this).val();
 
         if (newNodeId !== currentNodeId) {
           // Node switching logic
           if (currentNodeId) {
             // Save current node's message history
-            saveMessageHistory(currentNodeId, messageHistory);
+            await saveMessageHistory(currentNodeId, messageHistory);
           }
 
           currentNodeId = newNodeId;
 
           if (newNodeId) {
             // Save selected node
-            saveSelectedNode(newNodeId);
+            await saveSelectedNode(newNodeId);
 
             // Load new node's message history
-            messageHistory = loadMessageHistory(newNodeId);
+            messageHistory = await loadMessageHistory(newNodeId);
             restoreMessagesToUI(messageHistory);
             console.log(
               `🔄 Switched to node ${newNodeId}, loaded ${messageHistory.length} history messages`
             );
           } else {
             // Clear records when no node selected
-            saveSelectedNode(null);
+            await saveSelectedNode(null);
             messageHistory = [];
             messageContainer.empty();
           }

@@ -15,13 +15,13 @@ A Node-RED sidebar plugin integrating AI development assistant functionality wit
 - ⚙️ **Flexible Configuration**: Support for multiple node configurations with different AI settings for different projects
 - 🔒 **Secure Credentials**: Uses Node-RED's credentials mechanism to securely store API keys
 - 💬 **Multi-turn Conversations**: Supports context-aware continuous dialogue and tool chain calls
-- 💾 **Message Persistence**: Chat history automatically saved with localStorage, survives page refreshes
-- 🎯 **Smart Node Selection**: Automatically remembers and restores your last selected node
-- 🗑️ **History Management**: One-click clear chat history functionality
+- 💾 **Message Persistence**: Chat history now automatically saves to Node-RED context storage, survives server restarts
+- 🎯 **Smart Node Selection**: Automatically remembers and restores your last selected node using persistent context
+- 🗑️ **History Management**: Added clear button to easily delete chat history for current node
 - 🛠️ **Development-Focused**: Optimized prompts for Node-RED and JavaScript development
 - 🚀 **Latest SDKs**: Uses latest official SDKs including Google Gen AI SDK v1.7+
 
-## Latest Updates (v1.3.0)
+## Latest Updates (v1.4.0)
 
 ### Core LLM Integration
 
@@ -33,11 +33,11 @@ A Node-RED sidebar plugin integrating AI development assistant functionality wit
 
 ### User Experience Enhancements
 
-- ✅ **Message Persistence**: Chat history now automatically saves to localStorage and survives page refreshes
-- ✅ **Smart Node Selection**: Automatically remembers and restores your last selected node on page reload
+- ✅ **Message Persistence**: Chat history now automatically saves to Node-RED context storage, survives server restarts
+- ✅ **Smart Node Selection**: Automatically remembers and restores your last selected node using persistent context
 - ✅ **Silent Recovery**: Seamlessly restores conversation state without showing redundant welcome messages
 - ✅ **History Management**: Added clear button to easily delete chat history for current node
-- ✅ **Intelligent Fallback**: Gracefully handles localStorage limitations with fallback storage strategies
+- ✅ **Context Storage**: Replaced localStorage with Node-RED's built-in context storage for unlimited capacity and cross-browser sync
 
 ### Code Quality & Internationalization
 
@@ -306,10 +306,10 @@ https://github.com/modelcontextprotocol/inspector
    - Check if API quota is sufficient
 
 4. **Chat history not saving**
-   - Check if localStorage is enabled in browser
-   - Verify not using private/incognito mode (data clears on session end)
-   - Clear browser cache if localStorage appears corrupted
-   - Check browser storage quota (usually 5-10MB limit)
+   - Verify Node-RED context storage is properly configured
+   - Check if contextStorage is enabled in Node-RED settings.js
+   - Ensure Node-RED has write permissions to data directory
+   - Check Node-RED logs for context storage errors
 
 ### Debug Logs
 
