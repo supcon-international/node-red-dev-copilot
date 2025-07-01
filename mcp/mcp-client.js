@@ -6,8 +6,8 @@ const path = require("path");
 const fs = require("fs");
 
 /**
- * MCP 客户端辅助类 - 参考官方文档实现
- * 支持任意 MCP 服务器的连接和工具调用
+ * MCP Client Helper Class - Implementation based on official documentation
+ * Supports connection and tool calling for any MCP server
  */
 class MCPClientHelper {
   constructor() {
@@ -18,15 +18,15 @@ class MCPClientHelper {
   }
 
   /**
-   * 智能检测服务器类型和配置
-   * @param {string} serverPath - MCP 服务器路径
-   * @returns {Object} 服务器配置信息
+   * Intelligently detect server type and configuration
+   * @param {string} serverPath - MCP server path
+   * @returns {Object} Server configuration information
    */
   detectServerConfig(serverPath) {
     const ext = path.extname(serverPath).toLowerCase();
     const basename = path.basename(serverPath);
 
-    // 特殊处理：NPX 命令
+    // Special handling: NPX commands
     if (
       serverPath.startsWith("npx ") ||
       serverPath.includes("@modelcontextprotocol/") ||
@@ -40,7 +40,7 @@ class MCPClientHelper {
           serverPath: serverPath,
         };
       } else {
-        // 没有npx前缀，自动添加
+        // No npx prefix, automatically add it
         return {
           command: "npx",
           args: parts,
@@ -49,41 +49,41 @@ class MCPClientHelper {
       }
     }
 
-    // 检测文件是否存在（除了NPX包）
+    // Check if file exists (except for NPX packages)
     if (!fs.existsSync(serverPath)) {
-      throw new Error(`服务器文件不存在: ${serverPath}`);
+      throw new Error(`Server file does not exist: ${serverPath}`);
     }
 
     let command, args;
 
     if (ext === ".py") {
-      // Python 服务器
+      // Python server
       command = "python";
       args = [serverPath];
     } else if (ext === ".js") {
-      // Node.js 服务器
+      // Node.js server
       command = "node";
       args = [serverPath];
     } else if (ext === ".jar") {
-      // Java 服务器
+      // Java server
       command = "java";
       args = ["-jar", serverPath];
     } else if (basename.startsWith("npx") || serverPath.includes("npx")) {
-      // NPX 包服务器 (如 @modelcontextprotocol/server-*)
+      // NPX package server (e.g. @modelcontextprotocol/server-*)
       command = "npx";
-      args = serverPath.split(" ").slice(1); // 移除 'npx' 部分
+      args = serverPath.split(" ").slice(1); // Remove 'npx' part
     } else if (fs.statSync(serverPath).isDirectory()) {
-      // 目录 - 可能是 npm 项目
+      // Directory - possibly npm project
       const packageJson = path.join(serverPath, "package.json");
       if (fs.existsSync(packageJson)) {
         command = "npm";
         args = ["start"];
-        process.chdir(serverPath); // 切换到项目目录
+        process.chdir(serverPath); // Switch to project directory
       } else {
-        throw new Error(`目录 ${serverPath} 中没有找到 package.json`);
+        throw new Error(`No package.json found in directory ${serverPath}`);
       }
     } else {
-      // 尝试作为可执行文件
+      // Try as executable file
       command = serverPath;
       args = [];
     }
@@ -92,15 +92,15 @@ class MCPClientHelper {
   }
 
   /**
-   * 连接到 MCP 服务器 - 简化版本，支持直接命令配置
-   * @param {string} command - MCP 服务器启动命令
-   * @param {string[]} args - 命令行参数
-   * @param {Object} customEnv - 自定义环境变量
-   * @returns {Promise<boolean>} 连接是否成功
+   * Connect to MCP server - simplified version, supports direct command configuration
+   * @param {string} command - MCP server startup command
+   * @param {string[]} args - Command line arguments
+   * @param {Object} customEnv - Custom environment variables
+   * @returns {Promise<boolean>} Whether connection was successful
    */
   async connect(command, args = [], customEnv = {}) {
     try {
-      // 如果是旧版本调用（第一个参数是对象或包含路径的字符串），使用兼容模式
+      // If it's a legacy call (first parameter is object or string containing paths), use compatibility mode
       if (
         typeof command === "object" ||
         (typeof command === "string" &&
@@ -109,7 +109,7 @@ class MCPClientHelper {
         return this.connectLegacy(command, args);
       }
 
-      // 解析命令，处理 "npx package" 这样的情况
+      // Parse command, handle cases like "npx package"
       let finalCommand, finalArgs;
       if (command.includes(" ")) {
         const parts = command.split(" ");
@@ -120,45 +120,45 @@ class MCPClientHelper {
         finalArgs = args;
       }
 
-      console.log(`🔌 连接到 MCP 服务器:`);
-      console.log(`   命令: ${finalCommand}`);
+      console.log(`🔌 Connecting to MCP server:`);
+      console.log(`   Command: ${finalCommand}`);
       if (finalArgs.length > 0) {
-        console.log(`   参数: ${finalArgs.join(" ")}`);
+        console.log(`   Arguments: ${finalArgs.join(" ")}`);
       }
       if (Object.keys(customEnv).length > 0) {
-        console.log(`   环境变量: ${JSON.stringify(customEnv)}`);
+        console.log(`   Environment variables: ${JSON.stringify(customEnv)}`);
       }
 
-      // 合并环境变量
+      // Merge environment variables
       const env = { ...process.env, ...customEnv };
 
-      // 创建 transport - 参考官方文档
+      // Create transport - based on official documentation
       this.transport = new StdioClientTransport({
         command: finalCommand,
         args: finalArgs,
         env: env,
       });
 
-      // 创建客户端 - 参考官方文档
+      // Create client - based on official documentation
       this.client = new Client({
         name: "node-red-dev-copilot",
         version: "1.0.0",
       });
 
-      // 连接 - 参考官方文档
+      // Connect - based on official documentation
       await this.client.connect(this.transport);
 
       this.isConnected = true;
 
-      // 获取服务器信息
+      // Get server information
       await this.getServerCapabilities();
 
       console.log(
-        `✅ MCP 客户端已连接到: ${finalCommand} ${finalArgs.join(" ")}`
+        `✅ MCP client connected to: ${finalCommand} ${finalArgs.join(" ")}`
       );
       return true;
     } catch (error) {
-      console.error("❌ MCP 服务器连接失败:", error.message);
+      console.error("❌ MCP server connection failed:", error.message);
       this.isConnected = false;
       await this.cleanup();
       return false;
@@ -166,28 +166,28 @@ class MCPClientHelper {
   }
 
   /**
-   * 兼容旧版本的连接方法
-   * @param {string|Object} serverConfig - 服务器路径或配置对象
-   * @param {string[]} additionalArgs - 额外参数
-   * @returns {Promise<boolean>} 连接是否成功
+   * Legacy connection method for backward compatibility
+   * @param {string|Object} serverConfig - Server path or configuration object
+   * @param {string[]} additionalArgs - Additional arguments
+   * @returns {Promise<boolean>} Whether connection was successful
    */
   async connectLegacy(serverConfig, additionalArgs = []) {
     try {
       let config;
 
-      // 支持字符串路径或配置对象
+      // Support string path or configuration object
       if (typeof serverConfig === "string") {
         config = this.detectServerConfig(serverConfig);
       } else {
         config = serverConfig;
       }
 
-      // 合并额外参数
+      // Merge additional arguments
       const finalArgs = [...config.args, ...additionalArgs];
 
       return this.connect(config.command, finalArgs, {});
     } catch (error) {
-      console.error("❌ MCP 服务器连接失败:", error.message);
+      console.error("❌ MCP server connection failed:", error.message);
       this.isConnected = false;
       await this.cleanup();
       return false;
@@ -195,7 +195,7 @@ class MCPClientHelper {
   }
 
   /**
-   * 获取服务器能力信息
+   * Get server capability information
    */
   async getServerCapabilities() {
     if (!this.isConnected || !this.client) {
@@ -203,7 +203,7 @@ class MCPClientHelper {
     }
 
     try {
-      // 并行获取所有可用信息
+      // Get all available information in parallel
       const [toolsResponse, resourcesResponse, promptsResponse] =
         await Promise.allSettled([
           this.client.listTools(),
@@ -228,14 +228,14 @@ class MCPClientHelper {
         timestamp: new Date().toISOString(),
       };
 
-      console.log(`📋 服务器能力:`);
-      console.log(`   🔧 工具: ${this.serverInfo.tools.length} 个`);
-      console.log(`   📁 资源: ${this.serverInfo.resources.length} 个`);
-      console.log(`   💬 提示: ${this.serverInfo.prompts.length} 个`);
+      console.log(`📋 Server capabilities:`);
+      console.log(`   🔧 Tools: ${this.serverInfo.tools.length}`);
+      console.log(`   📁 Resources: ${this.serverInfo.resources.length}`);
+      console.log(`   💬 Prompts: ${this.serverInfo.prompts.length}`);
 
-      // 详细列出工具
+      // List tools in detail
       if (this.serverInfo.tools.length > 0) {
-        console.log(`   工具列表:`);
+        console.log(`   Tool list:`);
         this.serverInfo.tools.forEach((tool) => {
           console.log(`     - ${tool.name}: ${tool.description}`);
         });
@@ -243,7 +243,7 @@ class MCPClientHelper {
 
       return this.serverInfo;
     } catch (error) {
-      console.error("获取服务器能力失败:", error.message);
+      console.error("Failed to get server capabilities:", error.message);
       this.serverInfo = {
         tools: [],
         resources: [],
@@ -255,15 +255,15 @@ class MCPClientHelper {
   }
 
   /**
-   * 清理资源 - 参考官方文档的资源管理
+   * Clean up resources - based on official documentation resource management
    */
   async cleanup() {
     if (this.client && this.isConnected) {
       try {
         await this.client.close();
-        console.log("🔌 MCP 客户端已断开连接");
+        console.log("🔌 MCP client disconnected");
       } catch (error) {
-        console.error("断开 MCP 客户端连接时出错:", error.message);
+        console.error("Error disconnecting MCP client:", error.message);
       }
     }
 
@@ -274,74 +274,76 @@ class MCPClientHelper {
   }
 
   /**
-   * 断开连接 - 兼容性方法
+   * Disconnect - compatibility method
    */
   async disconnect() {
     await this.cleanup();
   }
 
   /**
-   * 列出可用的工具 - 参考官方文档实现
-   * @returns {Promise<Array>} 工具列表
+   * List available tools - implementation based on official documentation
+   * @returns {Promise<Array>} Tool list
    */
   async listTools() {
     if (!this.isConnected || !this.client) {
-      throw new Error("MCP 客户端未连接");
+      throw new Error("MCP client not connected");
     }
 
     try {
       const result = await this.client.listTools();
       return result.tools || [];
     } catch (error) {
-      console.error("获取 MCP 工具列表失败:", error.message);
-      throw new Error(`获取工具列表失败: ${error.message}`);
+      console.error("Failed to get MCP tools list:", error.message);
+      throw new Error(`Failed to get tools list: ${error.message}`);
     }
   }
 
   /**
-   * 调用工具 - 参考官方文档实现
-   * @param {string} name - 工具名称
-   * @param {Object} toolArgs - 工具参数
-   * @returns {Promise<Object>} 工具执行结果
+   * Call tool - implementation based on official documentation
+   * @param {string} name - Tool name
+   * @param {Object} toolArgs - Tool arguments
+   * @returns {Promise<Object>} Tool execution result
    */
   async callTool(name, toolArgs = {}) {
     if (!this.isConnected || !this.client) {
-      throw new Error("MCP 客户端未连接");
+      throw new Error("MCP client not connected");
     }
 
     try {
-      console.log(`🔧 调用 MCP 工具: ${name}`);
-      console.log(`📝 参数:`, JSON.stringify(toolArgs, null, 2));
+      console.log(`🔧 Calling MCP tool: ${name}`);
+      console.log(`📝 Arguments:`, JSON.stringify(toolArgs, null, 2));
 
       const result = await this.client.callTool({
         name: name,
         arguments: toolArgs,
       });
 
-      console.log(`✅ 工具调用成功: ${name}`);
+      console.log(`✅ Tool call successful: ${name}`);
       return result;
     } catch (error) {
-      console.error(`❌ MCP 工具 ${name} 调用失败:`, error.message);
+      console.error(`❌ MCP tool ${name} call failed:`, error.message);
 
-      // 提供更详细的错误信息
+      // Provide more detailed error information
       if (error.code === -32603 && error.message.includes("Unknown tool")) {
         throw new Error(
-          `工具 "${name}" 不存在。可用工具: ${
-            this.serverInfo?.tools?.map((t) => t.name).join(", ") || "无"
+          `Tool "${name}" does not exist. Available tools: ${
+            this.serverInfo?.tools?.map((t) => t.name).join(", ") || "none"
           }`
         );
       } else if (error.code === -32001) {
-        throw new Error(`工具 "${name}" 调用超时，请检查服务器状态`);
+        throw new Error(
+          `Tool "${name}" call timeout, please check server status`
+        );
       } else {
-        throw new Error(`工具 "${name}" 调用失败: ${error.message}`);
+        throw new Error(`Tool "${name}" call failed: ${error.message}`);
       }
     }
   }
 
   /**
-   * 获取工具的详细信息
-   * @param {string} toolName - 工具名称
-   * @returns {Object|null} 工具信息
+   * Get detailed information about a tool
+   * @param {string} toolName - Tool name
+   * @returns {Object|null} Tool information
    */
   getToolInfo(toolName) {
     if (!this.serverInfo || !this.serverInfo.tools) {
@@ -352,9 +354,9 @@ class MCPClientHelper {
   }
 
   /**
-   * 检查工具是否可用
-   * @param {string} toolName - 工具名称
-   * @returns {boolean} 工具是否可用
+   * Check if tool is available
+   * @param {string} toolName - Tool name
+   * @returns {boolean} Whether tool is available
    */
   hasTools(toolName) {
     if (Array.isArray(toolName)) {
@@ -364,8 +366,8 @@ class MCPClientHelper {
   }
 
   /**
-   * 列出可用的资源
-   * @returns {Promise<Array>} 资源列表
+   * List available resources
+   * @returns {Promise<Array>} Resource list
    */
   async listResources() {
     if (!this.isConnected || !this.client) {
@@ -382,9 +384,9 @@ class MCPClientHelper {
   }
 
   /**
-   * 读取资源
-   * @param {string} uri - 资源 URI
-   * @returns {Promise<Object>} 资源内容
+   * Read resource
+   * @param {string} uri - Resource URI
+   * @returns {Promise<Object>} Resource content
    */
   async readResource(uri) {
     if (!this.isConnected || !this.client) {
@@ -401,8 +403,8 @@ class MCPClientHelper {
   }
 
   /**
-   * 列出可用的提示
-   * @returns {Promise<Array>} 提示列表
+   * List available prompts
+   * @returns {Promise<Array>} Prompt list
    */
   async listPrompts() {
     if (!this.isConnected || !this.client) {
@@ -419,10 +421,10 @@ class MCPClientHelper {
   }
 
   /**
-   * 获取提示
-   * @param {string} name - 提示名称
-   * @param {Object} promptArgs - 提示参数
-   * @returns {Promise<Object>} 提示内容
+   * Get prompt
+   * @param {string} name - Prompt name
+   * @param {Object} promptArgs - Prompt arguments
+   * @returns {Promise<Object>} Prompt content
    */
   async getPrompt(name, promptArgs = {}) {
     if (!this.isConnected || !this.client) {
@@ -442,16 +444,16 @@ class MCPClientHelper {
   }
 
   /**
-   * 获取连接状态
-   * @returns {boolean} 是否已连接
+   * Get connection status
+   * @returns {boolean} Whether connected
    */
   isClientConnected() {
     return this.isConnected && this.client !== null;
   }
 
   /**
-   * 获取服务器信息
-   * @returns {Promise<Object>} 服务器信息
+   * Get server information
+   * @returns {Promise<Object>} Server information
    */
   async getServerInfo() {
     return (
@@ -465,74 +467,74 @@ class MCPClientHelper {
   }
 
   /**
-   * 刷新服务器能力信息
-   * @returns {Promise<Object>} 更新后的服务器信息
+   * Refresh server capability information
+   * @returns {Promise<Object>} Updated server information
    */
   async refreshServerInfo() {
     return await this.getServerCapabilities();
   }
 
   /**
-   * 静态工厂方法 - 快速创建并连接客户端
-   * @param {string|Object} serverConfig - 服务器配置
-   * @param {string[]} additionalArgs - 额外参数
-   * @returns {Promise<MCPClientHelper>} 已连接的客户端实例
+   * Static factory method - quickly create and connect client
+   * @param {string|Object} serverConfig - Server configuration
+   * @param {string[]} additionalArgs - Additional arguments
+   * @returns {Promise<MCPClientHelper>} Connected client instance
    */
   static async createAndConnect(serverConfig, additionalArgs = []) {
     const client = new MCPClientHelper();
     const success = await client.connect(serverConfig, additionalArgs);
 
     if (!success) {
-      throw new Error("无法连接到 MCP 服务器");
+      throw new Error("Unable to connect to MCP server");
     }
 
     return client;
   }
 
   /**
-   * 获取支持的服务器类型列表
-   * @returns {Array} 支持的服务器类型
+   * Get supported server types list
+   * @returns {Array} Supported server types
    */
   static getSupportedServerTypes() {
     return [
-      { type: "python", extension: ".py", description: "Python MCP 服务器" },
-      { type: "nodejs", extension: ".js", description: "Node.js MCP 服务器" },
-      { type: "java", extension: ".jar", description: "Java MCP 服务器" },
+      { type: "python", extension: ".py", description: "Python MCP server" },
+      { type: "nodejs", extension: ".js", description: "Node.js MCP server" },
+      { type: "java", extension: ".jar", description: "Java MCP server" },
       {
         type: "npx",
         command: "npx",
-        description: "NPX 包服务器 (如 @modelcontextprotocol/server-*)",
+        description: "NPX package server (e.g. @modelcontextprotocol/server-*)",
       },
-      { type: "directory", description: "npm 项目目录" },
-      { type: "executable", description: "可执行文件" },
+      { type: "directory", description: "npm project directory" },
+      { type: "executable", description: "executable file" },
     ];
   }
 
   /**
-   * 生成服务器配置示例
-   * @returns {Array} 服务器配置示例
+   * Generate server configuration examples
+   * @returns {Array} Server configuration examples
    */
   static getServerExamples() {
     return [
       {
-        name: "Everything服务器 (测试用)",
+        name: "Everything server (for testing)",
         config: "npx @modelcontextprotocol/server-everything",
-        description: "包含多种测试工具的示例服务器",
+        description: "Example server containing various test tools",
       },
       {
-        name: "Node-RED MCP服务器",
+        name: "Node-RED MCP server",
         config: "npx @node-red/mcp-server",
-        description: "Node-RED 官方 MCP 服务器",
+        description: "Node-RED official MCP server",
       },
       {
-        name: "Python 服务器",
+        name: "Python server",
         config: "/path/to/server.py",
-        description: "Python 编写的 MCP 服务器",
+        description: "MCP server written in Python",
       },
       {
-        name: "Node.js 服务器",
+        name: "Node.js server",
         config: "/path/to/server.js",
-        description: "Node.js 编写的 MCP 服务器",
+        description: "MCP server written in Node.js",
       },
     ];
   }

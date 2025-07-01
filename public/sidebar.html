@@ -42,6 +42,22 @@
         background: #357ebd;
       }
 
+      /* Clear button styles */
+      .dev-copilot-clear-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 11px;
+        margin-left: 5px;
+      }
+
+      .dev-copilot-clear-btn:hover {
+        background: #c82333;
+      }
+
       .dev-copilot-messages {
         flex: 1;
         min-height: 900px;
@@ -61,7 +77,7 @@
         clear: both;
       }
 
-      /* 滚动条样式 */
+      /* Scrollbar styles */
       .dev-copilot-messages::-webkit-scrollbar {
         width: 8px;
       }
@@ -226,24 +242,24 @@
   </head>
   <body>
     <div class="dev-copilot-container">
-      <!-- 头部 -->
+      <!-- Header -->
       <div class="dev-copilot-header">
         <div class="dev-copilot-title">AI Development Copilot</div>
 
-        <!-- 节点选择器 -->
+        <!-- Node selector -->
         <select id="dev-copilot-node-select" class="dev-copilot-node-selector">
           <option value="">Loading nodes...</option>
         </select>
 
-        <!-- 配置按钮 -->
+        <!-- Configuration button -->
         <button id="dev-copilot-config" class="dev-copilot-config-btn">
           <i class="fa fa-cog"></i> Configure
         </button>
       </div>
 
-      <!-- 主要内容区域 -->
+      <!-- Main content area -->
       <div class="dev-copilot-content">
-        <!-- 消息区域 -->
+        <!-- Message area -->
         <div id="dev-copilot-messages" class="dev-copilot-messages">
           <div class="dev-copilot-empty-state">
             Select a Dev Copilot node and start chatting!<br />
@@ -253,7 +269,7 @@
           </div>
         </div>
 
-        <!-- 输入区域 -->
+        <!-- Input area -->
         <div class="dev-copilot-input-area">
           <textarea
             id="dev-copilot-input"
@@ -266,20 +282,20 @@
           </button>
         </div>
 
-        <!-- 快捷键提示 -->
+        <!-- Shortcut tips -->
         <div class="dev-copilot-shortcuts">
           <strong>Tips:</strong> Enter to send • Shift+Enter for new line
         </div>
       </div>
 
-      <!-- 信息区域 -->
+      <!-- Info area -->
       <!-- <div class="dev-copilot-info">
         <strong>Ready:</strong> AI Assistant with MCP Tools
       </div>
     </div> -->
 
     <script>
-      // 自动调整输入框高度
+      // Auto-adjust input box height
       document.addEventListener("DOMContentLoaded", function () {
         const textarea = document.getElementById("dev-copilot-input");
         if (textarea) {

@@ -14,16 +14,29 @@ A Node-RED sidebar plugin integrating AI development assistant functionality wit
 - ⚙️ **Flexible Configuration**: Support for multiple node configurations with different AI settings for different projects
 - 🔒 **Secure Credentials**: Uses Node-RED's credentials mechanism to securely store API keys
 - 💬 **Multi-turn Conversations**: Supports context-aware continuous dialogue and tool chain calls
+- 💾 **Message Persistence**: Chat history automatically saved with localStorage, survives page refreshes
+- 🎯 **Smart Node Selection**: Automatically remembers and restores your last selected node
+- 🗑️ **History Management**: One-click clear chat history functionality
 - 🛠️ **Development-Focused**: Optimized prompts for Node-RED and JavaScript development
 - 🚀 **Latest SDKs**: Uses latest official SDKs including Google Gen AI SDK v1.7+
 
 ## Latest Updates (v1.2.0)
+
+### Core LLM Integration
 
 - ✅ **Migrated to Google Gen AI SDK**: Updated from `@google/generative-ai` to `@google/genai@^1.7.0` following Google's official migration guide
 - ✅ **Fixed Google API Tool Calling**: Completely rewritten Google API integration with correct SDK formats and automatic function calling
 - ✅ **Automatic Function Calling**: Implemented automatic function calling for all LLM providers (OpenAI, Google, DeepSeek)
 - ✅ **Enhanced Tool Integration**: Improved tool calling with better error handling and logging
 - ✅ **Performance Optimization**: Faster and more reliable API calls using latest SDKs
+
+### User Experience Enhancements
+
+- ✅ **Message Persistence**: Chat history now automatically saves to localStorage and survives page refreshes
+- ✅ **Smart Node Selection**: Automatically remembers and restores your last selected node on page reload
+- ✅ **Silent Recovery**: Seamlessly restores conversation state without showing redundant welcome messages
+- ✅ **History Management**: Added clear button to easily delete chat history for current node
+- ✅ **Intelligent Fallback**: Gracefully handles localStorage limitations with fallback storage strategies
 
 ## Installation
 
@@ -109,9 +122,16 @@ System Prompt: You are a Node-RED development assistant with MCP tools access.
 ### Sidebar Chat
 
 1. After configuring the node, click the "Dev Copilot" sidebar tab on the right side of Node-RED
-2. Select the Dev Copilot node to use from the dropdown menu
+2. Select the Dev Copilot node to use from the dropdown menu (your last selection will be automatically remembered)
 3. Enter your question in the input box and press Enter to send
 4. The AI will provide targeted development advice and code examples
+
+**Enhanced Features:**
+
+- 💾 **Persistent History**: Your chat conversations are automatically saved and will be restored when you return
+- 🔄 **Auto-Recovery**: Page refreshes won't lose your conversation - everything picks up where you left off
+- 🎯 **Smart Selection**: Your preferred node choice is remembered across sessions
+- 🗑️ **Easy Cleanup**: Use the red "Clear" button to delete chat history for the current node when needed
 
 ### Flow Integration
 
@@ -254,10 +274,17 @@ npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/server-filesyst
    - Use MCP Inspector to test server
 
 3. **API call failed**
+
    - Confirm API key is valid
    - Check network connection
    - Verify model name is correct
    - Check if API quota is sufficient
+
+4. **Chat history not saving**
+   - Check if localStorage is enabled in browser
+   - Verify not using private/incognito mode (data clears on session end)
+   - Clear browser cache if localStorage appears corrupted
+   - Check browser storage quota (usually 5-10MB limit)
 
 ### Debug Logs
 

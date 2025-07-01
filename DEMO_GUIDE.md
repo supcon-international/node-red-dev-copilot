@@ -47,19 +47,6 @@ node-red
 # MCP Server Args: @supcon-international/node-red-mcp-server
 ```
 
-#### 示例：文件系统服务器
-
-```bash
-# MCP Server Path: npx
-# MCP Server Args: -y @modelcontextprotocol/server-filesystem .
-```
-
-#### 示例：Everything 服务器
-
-```bash
-# MCP Server Path: npx
-# MCP Server Args: -y @modelcontextprotocol/server-everything
-```
 
 ### 4. 测试工具集成
 
@@ -119,30 +106,12 @@ node tests/test-mcp-llm-integration.js
 
 ### 推荐服务器
 
-1. **SUPCON Node-RED MCP 服务器**（推荐）
+**SUPCON Node-RED MCP 服务器**（推荐）
 
    ```bash
    npx @supcon-international/node-red-mcp-server
    ```
 
-### 官方服务器
-
-1. **文件系统服务器**
-
-   ```bash
-   npx -y @modelcontextprotocol/server-filesystem /path/to/directory
-   ```
-
-2. **Everything 服务器**
-
-   ```bash
-   npx -y @modelcontextprotocol/server-everything
-   ```
-
-3. **Git 服务器**
-   ```bash
-   npx -y @modelcontextprotocol/server-git /path/to/repo
-   ```
 
 ### 自定义服务器
 
