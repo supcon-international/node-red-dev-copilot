@@ -17,13 +17,6 @@ An AI programming assistant sidebar plugin for Node-RED with MCP (Model Context 
 - **Conversation History**: Supports multi-turn conversations with records saved in Node-RED global storage
 - **Flow Node**: Can be used as a regular node in flows besides the sidebar
 
-## Interface Preview
-
-Sidebar Interface:
-![picture 2](images/b3b5772c8ff2543bd0328f8921597887e17475aa257e4daf8bb092f8986123a7.png)
-
-Node Configuration Interface:
-![picture 1](images/81479b6cef87c00940da211b5071aab47932f9a296774f81e3f5cac1a2a4419b.png)
 
 ## Quick Start
 
