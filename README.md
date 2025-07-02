@@ -1,184 +1,161 @@
-# Node-RED Dev Copilot（Cursor-Like）
+# Node-RED Dev Copilot
 
-A Node-RED sidebar plugin integrating AI development assistant functionality with MCP (Model Context Protocol) support.
+An AI programming assistant sidebar plugin for Node-RED with MCP (Model Context Protocol) support.
 
 ![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+
 [中文文档](README_zh.md)
 
-## Features
+## Key Features
 
-- 🤖 **AI Development Assistant**: Integrates multiple LLM providers (OpenAI, Google, DeepSeek)
-- 🔧 **MCP Protocol Support**: Supports Model Context Protocol for automatic tool discovery and execution
-- 🎯 **Intelligent Tool Calling**: LLM automatically selects and executes tools based on requirements to get real-time data
-- ⚡ **Automatic Function Calling**: All supported LLMs use automatic function calling for seamless tool integration
-- 📱 **Sidebar UI**: Direct AI conversation within the Node-RED editor
-- ⚙️ **Flexible Configuration**: Support for multiple node configurations with different AI settings for different projects
-- 🔒 **Secure Credentials**: Uses Node-RED's credentials mechanism to securely store API keys
-- 💬 **Multi-turn Conversations**: Supports context-aware continuous dialogue and tool chain calls
-- 💾 **Message Persistence**: Chat history now automatically saves to Node-RED context storage, survives server restarts
-- 🎯 **Smart Node Selection**: Automatically remembers and restores your last selected node using persistent context
-- 🗑️ **History Management**: Added clear button to easily delete chat history for current node
-- 🛠️ **Development-Focused**: Optimized prompts for Node-RED and JavaScript development
-- 🚀 **Latest SDKs**: Uses latest official SDKs including Google Gen AI SDK v1.7+
+- **Multi-Platform AI Support**: Works with OpenAI, Google Gemini, DeepSeek and other mainstream AI services
+- **MCP Protocol Integration**: Auto-discovers and calls MCP tools, combined with our Node-RED MCP server for powerful AI assistance in Node-RED development
+- **Intelligent Tool Calling**: AI automatically selects and executes relevant tools as needed
+- **Sidebar Interface**: Use directly within the Node-RED editor without switching interfaces
+- **Multi-Node Switching**: Switch freely between different LLM nodes while maintaining unified chat history
+- **Secure Storage**: Uses Node-RED's built-in credentials management mechanism
+- **Conversation History**: Supports multi-turn conversations with records saved in Node-RED global storage
+- **Flow Node**: Can be used as a regular node in flows besides the sidebar
 
-## Latest Updates (v1.4.0)
+## Interface Preview
 
-### Core LLM Integration
+Sidebar Interface:
+![picture 2](images/b3b5772c8ff2543bd0328f8921597887e17475aa257e4daf8bb092f8986123a7.png)
 
-- ✅ **Migrated to Google Gen AI SDK**: Updated from `@google/generative-ai` to `@google/genai@^1.7.0` following Google's official migration guide
-- ✅ **Fixed Google API Tool Calling**: Completely rewritten Google API integration with correct SDK formats and automatic function calling
-- ✅ **Automatic Function Calling**: Implemented automatic function calling for all LLM providers (OpenAI, Google, DeepSeek)
-- ✅ **Enhanced Tool Integration**: Improved tool calling with better error handling and logging
-- ✅ **Performance Optimization**: Faster and more reliable API calls using latest SDKs
+Node Configuration Interface:
+![picture 1](images/81479b6cef87c00940da211b5071aab47932f9a296774f81e3f5cac1a2a4419b.png)
 
-### User Experience Enhancements
+## Quick Start
 
-- ✅ **Message Persistence**: Chat history now automatically saves to Node-RED context storage, survives server restarts
-- ✅ **Smart Node Selection**: Automatically remembers and restores your last selected node using persistent context
-- ✅ **Silent Recovery**: Seamlessly restores conversation state without showing redundant welcome messages
-- ✅ **History Management**: Added clear button to easily delete chat history for current node
-- ✅ **Context Storage**: Replaced localStorage with Node-RED's built-in context storage for unlimited capacity and cross-browser sync
+### Installation Methods
 
-### Code Quality & Internationalization
+**Recommended**: Search for `@supcon-international/node-red-dev-copilot` in Node-RED's Manage palette
 
-- ✅ **Complete English Codebase**: All Chinese comments and messages have been translated to English for better international collaboration
-- ✅ **Consistent Code Style**: Unified coding standards across all modules (mcp-client.js, dev-copilot.js, dev-copilot.html, sidebar.html)
-- ✅ **Enhanced Maintainability**: Improved code readability with comprehensive English documentation
-- ✅ **Developer Experience**: Better debugging with English console logs and error messages
-
-## Installation
-
-### Download from NODE-RED Manage Palette directly (Recommended)
-
-### Install via NPM
+Or install via npm:
 
 ```bash
 cd ~/.node-red
-npm install node-red-sidebar-dev-copilot
+npm install @supcon-international/node-red-dev-copilot
 ```
 
-### Manual Installation
-
-1. Clone the repository to the Node-RED user directory:
+Manual installation:
 
 ```bash
 cd ~/.node-red
-git clone https://github.com/supcon-international/node-red-sidebar-dev-copilot.git
-cd node-red-sidebar-dev-copilot
+git clone https://github.com/supcon-international/node-red-dev-copilot.git
+cd node-red-dev-copilot
 npm install
 ```
 
-2. Restart the Node-RED service
+Restart Node-RED after installation.
 
-## Configuration
+## Configuration Guide
 
-### 1. Add Dev Copilot Node
+### Basic Setup
 
-In the Node-RED editor:
+To save chat history, configure persistent storage in Node-RED's `settings.js`:
 
-1. Drag the "dev copilot" node from the "ai" category in the node panel to the flow
+```javascript
+// ~/.node-red/settings.js
+contextStorage: {
+    default: {
+        module: "localfilesystem",
+    }
+},
+```
+
+After this configuration:
+
+- Chat history will be saved to files and persist after restarts
+- Multiple browsers can share chat data
+- Data is stored in `~/.node-red/context/global/global.json`
+
+It works without this configuration, but chat history will only be valid during the current session.
+
+### Adding and Configuring Nodes
+
+1. Drag the "dev copilot" node from the "AI dev copilot" category to the canvas
 2. Double-click the node to configure
 
-### 2. Basic Configuration
+Main configuration options:
 
-#### LLM Provider Settings
+**AI Service Settings**
 
-- **Provider**: Select AI provider (openai, google, deepseek)
-- **Model**: Specify model name (e.g., gpt-4, gemini-1.5-pro, deepseek-chat)
-- **API Key**: Enter the corresponding provider's API key (will be stored securely)
-- **Temperature**: Controls randomness (0.0 = deterministic, 2.0 = very creative). For coding tasks, use 0.0-0.3
-- **Max Tokens**: Maximum response length. For coding: 1000-2000 for snippets, 3000-4000 for complex solutions
-- **Tool Call Limit**: Maximum rounds of tool calls to prevent infinite loops. For complex tasks, use 8-15
+- Provider: Choose AI provider (openai/google/deepseek)
+- Model: Model name (e.g., gpt-4, gemini-2.5-pro, deepseek-chat)
+- API Key: Corresponding service API key
+- Temperature: Randomness control (0-2, recommended 0.1-0.3 for programming)
+- Max Tokens: Maximum response length (recommended 2000-4000)
+- Tool Call Limit: Tool call round limit (recommended 10-15)
 
-#### MCP Server Settings (Optional)
+**MCP Server Settings** (optional)
 
-- **MCP Command**: MCP server startup command (e.g., npx @supcon-international/node-red-mcp-server)
-- **Arguments**: Optional command line arguments, separated by spaces
-- **Environment Variables**: Optional environment variables, format: KEY=value, multiple separated by commas
-- **System Prompt**: Custom system prompt for AI interactions
+- MCP Command: Server startup command (default: `npx @supcon-international/node-red-mcp-server`)
+- Arguments: Command line arguments
+- Environment Variables: Environment variables (format: KEY=value,KEY2=value2)
+- System Prompt: Custom system prompt
 
-### 3. Example Configurations
+### Configuration Examples
 
-#### OpenAI Configuration
+**OpenAI Configuration**
 
 ```
 Provider: openai
 Model: gpt-4
-API Key: sk-...(your OpenAI API key)
+API Key: sk-xxx...
 Temperature: 0.1
 Max Tokens: 2000
-Tool Call Limit: 10
 ```
 
-#### DeepSeek Configuration
+**Google Gemini Configuration**
+
+```
+Provider: google
+Model: gemini-2.5-pro
+API Key: AIxxx...
+Temperature: 0.1
+Max Tokens: 2000
+```
+
+**DeepSeek Configuration**
 
 ```
 Provider: deepseek
 Model: deepseek-chat
-API Key: sk-...(your DeepSeek API key)
+API Key: sk-xxx...
 Temperature: 0.1
 Max Tokens: 2000
-Tool Call Limit: 10
-```
-
-#### Google Configuration
-
-```
-Provider: google
-Model: gemini-1.5-pro
-API Key: ...(your Google API key)
-Temperature: 0.1
-Max Tokens: 2000
-Tool Call Limit: 10
-```
-
-#### Using MCP Server
-
-```
-MCP Command: npx @supcon-international/node-red-mcp-server
-Arguments: --port 3000 --verbose
-Environment Variables: API_KEY=xxx,DEBUG=true
-System Prompt: You are a Node-RED development assistant with MCP tools access.
 ```
 
 ## Usage
 
 ### Sidebar Chat
 
-1. After configuring the node, click the "Dev Copilot" sidebar tab on the right side of Node-RED
-2. Select the Dev Copilot node to use from the dropdown menu (your last selection will be automatically remembered)
-3. Enter your question in the input box and press Enter to send
-4. The AI will provide targeted development advice and code examples
+1. After configuring nodes, click the "Dev Copilot" tab on the right
+2. Select the node to use (remembers your last choice)
+3. Enter your question and press Enter to send
+4. AI will automatically call MCP tools to assist with development work
 
-**Enhanced Features:**
+Chat history is automatically saved and will restore after page refresh. Use the "Clear" button to remove all records.
 
-- 💾 **Persistent History**: Your chat conversations are automatically saved and will be restored when you return
-- 🔄 **Auto-Recovery**: Page refreshes won't lose your conversation - everything picks up where you left off
-- 🎯 **Smart Selection**: Your preferred node choice is remembered across sessions
-- 🗑️ **Easy Cleanup**: Use the red "Clear" button to delete chat history for the current node when needed
+### As Flow Node
 
-### Flow Integration
-
-The Dev Copilot node can also be used as a regular Node-RED node:
+Can also be used as a regular node in flows:
 
 ```javascript
-// Input message format
-msg = {
-    payload: "How to create a HTTP request node in Node-RED?",
+// Input format
+{
+    payload: "How to create an HTTP request node?",
     history: [  // Optional conversation history
         {role: "user", content: "Previous question"},
         {role: "assistant", content: "Previous answer"}
     ]
 }
 
-// Output message format
-msg = {
-    payload: "AI response text",
-    llm_config: {
-        provider: "openai",
-        model: "gpt-4",
-        system_prompt: "..."
-    },
+// Output format
+{
+    payload: "AI response",
+    llm_config: { provider: "openai", model: "gpt-4", ... },
     mcp_available: true,
     mcp_tools: [...]  // Available MCP tools list
 }
@@ -186,175 +163,124 @@ msg = {
 
 ## MCP Integration
 
-### Supported MCP Features
+Supports standard MCP functionality:
 
-- ✅ **Tools**: Call tools provided by MCP servers
-- ✅ **Resources**: Access resources from MCP servers
-- ✅ **Prompts**: Use prompt templates from MCP servers
-- ✅ **Stdio Transport**: Communicate with MCP servers via stdio
+- Tools: Call tools provided by MCP servers
+- Resources: Access MCP server resources
+- Prompts: Use MCP server prompt templates
+- Stdio Transport: Communicate with MCP servers via standard input/output
 
-### Common MCP Servers
+Recommended to use with our Node-RED MCP server:
 
 ```bash
-# SUPCON Node-RED MCP Server (Recommended)
 npx @supcon-international/node-red-mcp-server
-
-# Filesystem server
-npx -y @modelcontextprotocol/server-filesystem /path/to/project
-
-# Git server
-npx -y @modelcontextprotocol/server-git /path/to/repo
-
-# SQLite server
-npx -y @modelcontextprotocol/server-sqlite /path/to/database.db
-
-# Browser automation
-npx -y @modelcontextprotocol/server-puppeteer
 ```
 
-## API Reference
+## API Endpoints
 
-### HTTP Endpoints
+The plugin provides the following HTTP interfaces:
 
-- `GET /dev-copilot/sidebar` - Get sidebar HTML
+- `GET /dev-copilot/sidebar` - Get sidebar page
 - `POST /dev-copilot/chat` - Send chat message
 - `GET /dev-copilot/nodes` - Get available nodes list
-
-### Node Configuration Properties
-
-| Property      | Type        | Required | Description                                       |
-| ------------- | ----------- | -------- | ------------------------------------------------- |
-| name          | string      | No       | Node display name                                 |
-| provider      | string      | Yes      | LLM provider (openai, google, deepseek)           |
-| model         | string      | Yes      | Model name (e.g., gpt-4, gemini-1.5-pro)          |
-| apiKey        | credentials | Yes      | API key for the selected provider                 |
-| temperature   | number      | Yes      | Controls randomness (0.0-2.0, default: 0.1)       |
-| maxTokens     | number      | Yes      | Maximum response length (100-8000, default: 2000) |
-| toolCallLimit | number      | Yes      | Maximum tool call rounds (1-20, default: 10)      |
-| mcpCommand    | string      | No       | MCP server startup command                        |
-| mcpArgs       | string      | No       | MCP server command line arguments                 |
-| mcpEnv        | string      | No       | Environment variables (KEY=value,KEY2=value2)     |
-| systemPrompt  | string      | No       | Custom system prompt for AI interactions          |
 
 ## Development
 
 ### Project Structure
 
 ```
-node-red-sidebar-dev-copilot/
-├── package.json              # NPM package configuration
+node-red-dev-copilot/
+├── package.json              # Package configuration
 ├── nodes/
 │   ├── dev-copilot.js       # Node backend logic
-│   └── dev-copilot.html     # Node frontend configuration
+│   └── dev-copilot.html     # Node frontend and sidebar registration
 ├── public/
 │   └── sidebar.html         # Sidebar interface
 ├── mcp/
-│   └── mcp-client.js        # MCP client helper class
+│   └── mcp-client.js        # MCP client
 └── README.md                # Documentation
 ```
 
 ### Local Development
 
-1. Clone the project:
-
 ```bash
-git clone https://github.com/supcon-international/node-red-sidebar-dev-copilot.git
-cd node-red-sidebar-dev-copilot
-```
-
-2. Install dependencies:
-
-```bash
+git clone https://github.com/supcon-international/node-red-dev-copilot.git
+cd node-red-dev-copilot
 npm install
-```
 
-3. Link to Node-RED:
-
-```bash
+# Link to Node-RED
 cd ~/.node-red
-npm link /path/to/node-red-sidebar-dev-copilot
+npm link /path/to/node-red-dev-copilot
 ```
 
-4. Restart Node-RED for testing
+Then restart Node-RED for testing.
 
-### Testing MCP Connection
+## Common Issues
 
-Use MCP Inspector to test server connection:
-https://github.com/modelcontextprotocol/inspector
+**Sidebar not showing**
 
-## Troubleshooting
+- Check Node-RED version >= 3.0.0
+- Confirm plugin installation is correct
+- Check browser console for errors
 
-### Common Issues
+**MCP connection failed**
 
-1. **Sidebar not displaying**
+- Check MCP server path
+- Verify parameter format is correct
+- Can test with [MCP Inspector](https://github.com/modelcontextprotocol/inspector)
 
-   - Check if Node-RED version is >=3.0.0
-   - Confirm plugin is correctly installed
-   - Check browser console for error messages
+**API call failed**
 
-2. **MCP connection failed**
+- Confirm API key is valid
+- Check network connection
+- Verify model name is correct
+- Confirm API balance is sufficient
 
-   - Verify MCP server path is correct
-   - Check server parameter format
-   - Use MCP Inspector to test server
+**Chat history not saving**
 
-3. **API call failed**
+- Check contextStorage configuration in settings.js
+- Confirm Node-RED has write permissions to context directory
+- Restart Node-RED after configuration changes
 
-   - Confirm API key is valid
-   - Check network connection
-   - Verify model name is correct
-   - Check if API quota is sufficient
-
-4. **Chat history not saving**
-   - Verify Node-RED context storage is properly configured
-   - Check if contextStorage is enabled in Node-RED settings.js
-   - Ensure Node-RED has write permissions to data directory
-   - Check Node-RED logs for context storage errors
-
-### Debug Logs
-
-Enable Node-RED debug logs:
+### View Logs
 
 ```bash
-DEBUG=* node-red
+# View Node-RED logs
+tail -f ~/.node-red/node-red.log
+
+# Enable detailed logs
+DEBUG=node-red:* node-red
 ```
 
-View Dev Copilot related logs:
+## Future Plans
 
-```bash
-DEBUG=node-red-sidebar-dev-copilot:* node-red
-```
+- Optimize long conversation handling to avoid slow responses
+- Add API usage statistics functionality
+- Improve caching mechanism to reduce duplicate calls
+- Support more MCP servers
 
 ## Contributing
 
-Issues and Pull Requests are welcome!
+Issues and Pull Requests are welcome.
 
-1. Fork the project
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push the branch (`git push origin feature/amazing-feature`)
-5. Create a Pull Request
+Standard process:
+
+1. Fork this project
+2. Create feature branch (`git checkout -b feature/new-feature`)
+3. Commit changes (`git commit -m 'Add some feature'`)
+4. Push to branch (`git push origin feature/new-feature`)
+5. Create Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details
 
-## Related Links
+## Technical Support
 
-- [SUPCON International](https://www.supcon.com/)
-- [Node-RED Official Website](https://nodered.org/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
+If you encounter issues:
 
-## Support
-
-If you have questions, please:
-
-1. Check the [documentation](README.md)
-2. Search [existing Issues](https://github.com/supcon-international/node-red-sidebar-dev-copilot/issues)
-3. Create a new Issue describing the problem
-4. Contact SUPCON technical support
+1. Check this documentation and [Chinese documentation](README_zh.md)
+2. Search [existing Issues](https://github.com/supcon-international/node-red-dev-copilot/issues)
+3. Create new Issue describing the problem
 
 ---
-
-**Made with ❤️ by SUPCON International**

@@ -18,74 +18,46 @@ class MCPClientHelper {
   }
 
   /**
-   * Intelligently detect server type and configuration
+   * Detect server configuration (simplified version)
    * @param {string} serverPath - MCP server path
    * @returns {Object} Server configuration information
    */
   detectServerConfig(serverPath) {
-    const ext = path.extname(serverPath).toLowerCase();
-    const basename = path.basename(serverPath);
-
-    // Special handling: NPX commands
-    if (
-      serverPath.startsWith("npx ") ||
-      serverPath.includes("@modelcontextprotocol/") ||
-      serverPath.includes("@node-red/")
-    ) {
+    // Handle NPX commands
+    if (serverPath.startsWith("npx ")) {
       const parts = serverPath.split(" ");
-      if (parts[0] === "npx") {
-        return {
-          command: "npx",
-          args: parts.slice(1),
-          serverPath: serverPath,
-        };
-      } else {
-        // No npx prefix, automatically add it
-        return {
-          command: "npx",
-          args: parts,
-          serverPath: serverPath,
-        };
-      }
+      return {
+        command: "npx",
+        args: parts[0] === "npx" ? parts.slice(1) : parts,
+        serverPath: serverPath,
+      };
     }
 
-    // Check if file exists (except for NPX packages)
+    // Check if file exists
     if (!fs.existsSync(serverPath)) {
       throw new Error(`Server file does not exist: ${serverPath}`);
     }
 
+    const ext = path.extname(serverPath).toLowerCase();
     let command, args;
 
-    if (ext === ".py") {
-      // Python server
-      command = "python";
-      args = [serverPath];
-    } else if (ext === ".js") {
-      // Node.js server
-      command = "node";
-      args = [serverPath];
-    } else if (ext === ".jar") {
-      // Java server
-      command = "java";
-      args = ["-jar", serverPath];
-    } else if (basename.startsWith("npx") || serverPath.includes("npx")) {
-      // NPX package server (e.g. @modelcontextprotocol/server-*)
-      command = "npx";
-      args = serverPath.split(" ").slice(1); // Remove 'npx' part
-    } else if (fs.statSync(serverPath).isDirectory()) {
-      // Directory - possibly npm project
-      const packageJson = path.join(serverPath, "package.json");
-      if (fs.existsSync(packageJson)) {
-        command = "npm";
-        args = ["start"];
-        process.chdir(serverPath); // Switch to project directory
-      } else {
-        throw new Error(`No package.json found in directory ${serverPath}`);
-      }
-    } else {
-      // Try as executable file
-      command = serverPath;
-      args = [];
+    switch (ext) {
+      case ".py":
+        command = "python";
+        args = [serverPath];
+        break;
+      case ".js":
+        command = "node";
+        args = [serverPath];
+        break;
+      case ".jar":
+        command = "java";
+        args = ["-jar", serverPath];
+        break;
+      default:
+        // Try as executable
+        command = serverPath;
+        args = [];
     }
 
     return { command, args, serverPath };
@@ -120,15 +92,6 @@ class MCPClientHelper {
         finalArgs = args;
       }
 
-      console.log(`🔌 Connecting to MCP server:`);
-      console.log(`   Command: ${finalCommand}`);
-      if (finalArgs.length > 0) {
-        console.log(`   Arguments: ${finalArgs.join(" ")}`);
-      }
-      if (Object.keys(customEnv).length > 0) {
-        console.log(`   Environment variables: ${JSON.stringify(customEnv)}`);
-      }
-
       // Merge environment variables
       const env = { ...process.env, ...customEnv };
 
@@ -142,7 +105,7 @@ class MCPClientHelper {
       // Create client - based on official documentation
       this.client = new Client({
         name: "node-red-dev-copilot",
-        version: "1.0.0",
+        version: "1.5.0",
       });
 
       // Connect - based on official documentation
@@ -153,9 +116,6 @@ class MCPClientHelper {
       // Get server information
       await this.getServerCapabilities();
 
-      console.log(
-        `✅ MCP client connected to: ${finalCommand} ${finalArgs.join(" ")}`
-      );
       return true;
     } catch (error) {
       console.error("❌ MCP server connection failed:", error.message);
@@ -228,19 +188,6 @@ class MCPClientHelper {
         timestamp: new Date().toISOString(),
       };
 
-      console.log(`📋 Server capabilities:`);
-      console.log(`   🔧 Tools: ${this.serverInfo.tools.length}`);
-      console.log(`   📁 Resources: ${this.serverInfo.resources.length}`);
-      console.log(`   💬 Prompts: ${this.serverInfo.prompts.length}`);
-
-      // List tools in detail
-      if (this.serverInfo.tools.length > 0) {
-        console.log(`   Tool list:`);
-        this.serverInfo.tools.forEach((tool) => {
-          console.log(`     - ${tool.name}: ${tool.description}`);
-        });
-      }
-
       return this.serverInfo;
     } catch (error) {
       console.error("Failed to get server capabilities:", error.message);
@@ -261,7 +208,6 @@ class MCPClientHelper {
     if (this.client && this.isConnected) {
       try {
         await this.client.close();
-        console.log("🔌 MCP client disconnected");
       } catch (error) {
         console.error("Error disconnecting MCP client:", error.message);
       }
@@ -271,13 +217,6 @@ class MCPClientHelper {
     this.transport = null;
     this.isConnected = false;
     this.serverInfo = null;
-  }
-
-  /**
-   * Disconnect - compatibility method
-   */
-  async disconnect() {
-    await this.cleanup();
   }
 
   /**
@@ -310,15 +249,11 @@ class MCPClientHelper {
     }
 
     try {
-      console.log(`🔧 Calling MCP tool: ${name}`);
-      console.log(`📝 Arguments:`, JSON.stringify(toolArgs, null, 2));
-
       const result = await this.client.callTool({
         name: name,
         arguments: toolArgs,
       });
 
-      console.log(`✅ Tool call successful: ${name}`);
       return result;
     } catch (error) {
       console.error(`❌ MCP tool ${name} call failed:`, error.message);
@@ -355,8 +290,8 @@ class MCPClientHelper {
 
   /**
    * Check if tool is available
-   * @param {string} toolName - Tool name
-   * @returns {boolean} Whether tool is available
+   * @param {string|Array} toolName - Tool name or array of tool names
+   * @returns {boolean} Whether tool(s) are available
    */
   hasTools(toolName) {
     if (Array.isArray(toolName)) {
@@ -444,6 +379,14 @@ class MCPClientHelper {
   }
 
   /**
+   * Refresh server capability information
+   * @returns {Promise<Object>} Updated server information
+   */
+  async refreshServerInfo() {
+    return await this.getServerCapabilities();
+  }
+
+  /**
    * Get connection status
    * @returns {boolean} Whether connected
    */
@@ -464,79 +407,6 @@ class MCPClientHelper {
         connected: this.isConnected,
       }
     );
-  }
-
-  /**
-   * Refresh server capability information
-   * @returns {Promise<Object>} Updated server information
-   */
-  async refreshServerInfo() {
-    return await this.getServerCapabilities();
-  }
-
-  /**
-   * Static factory method - quickly create and connect client
-   * @param {string|Object} serverConfig - Server configuration
-   * @param {string[]} additionalArgs - Additional arguments
-   * @returns {Promise<MCPClientHelper>} Connected client instance
-   */
-  static async createAndConnect(serverConfig, additionalArgs = []) {
-    const client = new MCPClientHelper();
-    const success = await client.connect(serverConfig, additionalArgs);
-
-    if (!success) {
-      throw new Error("Unable to connect to MCP server");
-    }
-
-    return client;
-  }
-
-  /**
-   * Get supported server types list
-   * @returns {Array} Supported server types
-   */
-  static getSupportedServerTypes() {
-    return [
-      { type: "python", extension: ".py", description: "Python MCP server" },
-      { type: "nodejs", extension: ".js", description: "Node.js MCP server" },
-      { type: "java", extension: ".jar", description: "Java MCP server" },
-      {
-        type: "npx",
-        command: "npx",
-        description: "NPX package server (e.g. @modelcontextprotocol/server-*)",
-      },
-      { type: "directory", description: "npm project directory" },
-      { type: "executable", description: "executable file" },
-    ];
-  }
-
-  /**
-   * Generate server configuration examples
-   * @returns {Array} Server configuration examples
-   */
-  static getServerExamples() {
-    return [
-      {
-        name: "Everything server (for testing)",
-        config: "npx @modelcontextprotocol/server-everything",
-        description: "Example server containing various test tools",
-      },
-      {
-        name: "Node-RED MCP server",
-        config: "npx @node-red/mcp-server",
-        description: "Node-RED official MCP server",
-      },
-      {
-        name: "Python server",
-        config: "/path/to/server.py",
-        description: "MCP server written in Python",
-      },
-      {
-        name: "Node.js server",
-        config: "/path/to/server.js",
-        description: "MCP server written in Node.js",
-      },
-    ];
   }
 }
 

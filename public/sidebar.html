@@ -20,27 +20,13 @@
       }
 
       .dev-copilot-node-selector {
-        width: 100%;
         padding: 3px;
-        margin-bottom: 6px;
         border: 1px solid #ccc;
         border-radius: 3px;
         font-size: 12px;
       }
 
-      .dev-copilot-config-btn {
-        background: #428bca;
-        color: white;
-        border: none;
-        padding: 4px 8px;
-        border-radius: 3px;
-        cursor: pointer;
-        font-size: 11px;
-      }
 
-      .dev-copilot-config-btn:hover {
-        background: #357ebd;
-      }
 
       /* Clear button styles */
       .dev-copilot-clear-btn {
@@ -51,7 +37,7 @@
         border-radius: 3px;
         cursor: pointer;
         font-size: 11px;
-        margin-left: 5px;
+        white-space: nowrap;
       }
 
       .dev-copilot-clear-btn:hover {
@@ -246,15 +232,16 @@
       <div class="dev-copilot-header">
         <div class="dev-copilot-title">AI Development Copilot</div>
 
-        <!-- Node selector -->
-        <select id="dev-copilot-node-select" class="dev-copilot-node-selector">
-          <option value=""> nodes...</option>
-        </select>
+        <!-- Node selector and clear button -->
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+          <select id="dev-copilot-node-select" class="dev-copilot-node-selector" style="flex: 1; margin-bottom: 0;">
+            <option value=""> nodes...</option>
+          </select>
+          <button id="dev-copilot-clear" class="dev-copilot-clear-btn" title="Clear all global chat history (shared across all nodes)">
+            🗑️ Clear
+          </button>
+        </div>
 
-        <!-- Configuration button -->
-        <button id="dev-copilot-config" class="dev-copilot-config-btn">
-          <i class="fa fa-cog"></i> Configure
-        </button>
       </div>
 
       <!-- Main content area -->

@@ -1,65 +1,44 @@
-# Node-RED Dev Copilot (Cursor-Like)
+# Node-RED Dev Copilot
 
-一个集成 AI 开发助手功能的 Node-RED 侧边栏插件，支持 MCP（Model Context Protocol）协议。
+一个为 Node-RED 开发的 AI 编程助手侧边栏插件，支持 MCP (Model Context Protocol) 协议。
 
 ![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+
 [English](README.md)
 
-## 功能特性
+## 主要功能
 
-- 🤖 **AI 开发助手**: 集成多种 LLM 提供商（OpenAI、Google、DeepSeek）
-- 🔧 **MCP 协议支持**: 支持 Model Context Protocol，自动发现和调用 MCP 工具
-- 🎯 **智能工具调用**: LLM 根据需求自动选择和执行工具，获取实时数据
-- ⚡ **自动函数调用**: 所有支持的 LLM 都使用自动函数调用，实现无缝工具集成
-- 📱 **侧边栏 UI**: 直接在 Node-RED 编辑器中进行 AI 对话
-- ⚙️ **灵活配置**: 支持多节点配置，不同项目使用不同 AI 设置
-- 🔒 **安全凭证**: 使用 Node-RED 的 credentials 机制安全存储 API 密钥
-- 💬 **多轮对话**: 支持上下文感知的连续对话和工具链调用
-- 💾 **消息持久化**: 聊天记录自动保存到本地存储，页面刷新不丢失
-- 🎯 **智能节点选择**: 自动记住并恢复上次选择的节点
-- 🗑️ **历史记录管理**: 一键清除当前节点的聊天记录
-- 🛠️ **开发专用**: 针对 Node-RED 和 JavaScript 开发优化的提示词
-- 🚀 **最新 SDK**: 使用最新官方 SDK，包括 Google Gen AI SDK v1.7+
+- **多平台 AI 支持**: 支持 OpenAI、Google Gemini、DeepSeek 主流 AI 服务
+- **MCP 协议集成**: 自动发现和调用 MCP 工具，结合我们的 Node-RED MCP 服务器，为 Node-RED 开发提供强大的 AI 辅助能力
+- **智能工具调用**: AI 可以根据需要自动选择和执行相关工具
+- **侧边栏界面**: 直接在 Node-RED 编辑器中使用，无需切换界面
+- **多节点切换**: 支持在不同 LLM 节点之间自由切换，统一保留聊天历史记录
+- **安全存储**: 使用 Node-RED 内置的凭证管理机制
+- **对话记录**: 支持多轮对话，记录保存在 Node-RED 的全局存储中
+- **Flow 节点**: 除了侧边栏，也可以作为 Flow 中的普通节点使用
 
-## 最新更新 (v1.4.0)
+## 界面预览
 
-### 核心 LLM 集成
+侧边栏界面：
+![picture 2](images/b3b5772c8ff2543bd0328f8921597887e17475aa257e4daf8bb092f8986123a7.png)
 
-- ✅ **迁移到 Google Gen AI SDK**: 从 `@google/generative-ai` 更新到 `@google/genai@^1.7.0`，遵循 Google 官方迁移指南
-- ✅ **修复 Google API 工具调用**: 完全重写 Google API 集成，使用正确的 SDK 格式和自动函数调用
-- ✅ **自动函数调用**: 为所有 LLM 提供商（OpenAI、Google、DeepSeek）实现自动函数调用
-- ✅ **增强工具集成**: 改进工具调用，提供更好的错误处理和日志记录
-- ✅ **性能优化**: 使用最新 SDK 实现更快、更可靠的 API 调用
+节点配置界面：
+![picture 1](images/81479b6cef87c00940da211b5071aab47932f9a296774f81e3f5cac1a2a4419b.png)
 
-### 用户体验增强
+## 快速开始
 
-- ✅ **消息持久化**: 聊天记录现在自动保存到 Node-RED context 存储，服务重启后不丢失
-- ✅ **智能节点选择**: 使用持久化 context 自动记住并在页面重新加载时恢复上次选择的节点
-- ✅ **静默恢复**: 无缝恢复对话状态，不显示冗余的欢迎信息
-- ✅ **历史记录管理**: 添加清除按钮，轻松删除当前节点的聊天记录
-- ✅ **Context 存储**: 使用 Node-RED 内置 context 存储替代 localStorage，无容量限制且跨浏览器同步
+### 安装方式
 
-### 代码质量与国际化
+**推荐**: 通过 Node-RED 的 Manage palette 搜索 `@supcon-international/node-red-dev-copilot`
 
-- ✅ **完全英文代码库**: 所有中文注释和消息已翻译为英文，便于国际化协作
-- ✅ **统一代码风格**: 统一所有模块的编码规范（mcp-client.js、dev-copilot.js、dev-copilot.html、sidebar.html）
-- ✅ **增强可维护性**: 通过全面的英文文档提高代码可读性
-- ✅ **开发者体验**: 使用英文控制台日志和错误消息，提供更好的调试体验
-
-## 安装
-
-### 通过 Node-RED 的 Manage palette 搜索 node-red-sidebar-dev-copilot 下载 （推荐）
-
-### 通过 NPM 安装
+或者使用 npm 安装：
 
 ```bash
 cd ~/.node-red
-npm install node-red-sidebar-dev-copilot
+npm install @supcon-international/node-red-dev-copilot
 ```
 
-### 手动安装
-
-1. 克隆仓库到 Node-RED 用户目录：
+手动安装：
 
 ```bash
 cd ~/.node-red
@@ -68,281 +47,240 @@ cd node-red-sidebar-dev-copilot
 npm install
 ```
 
-2. 重启 Node-RED 服务
+安装完成后重启 Node-RED。
 
-## 配置
+## 配置说明
 
-### 1. 添加 Dev Copilot 节点
+### 基本设置
 
-在 Node-RED 编辑器中：
+为了保存聊天记录，建议在 Node-RED 的 `settings.js` 中配置持久存储：
 
-1. 从节点面板的"ai"分类中拖拽"dev copilot"节点到流程中
+```javascript
+// ~/.node-red/settings.js
+contextStorage: {
+    default: {
+        module: "localfilesystem",
+    }
+},
+```
+
+这样配置后：
+
+- 聊天记录会保存在文件中，重启后不丢失
+- 多个浏览器可以共享聊天数据
+- 数据存储在 `~/.node-red/context/global/global.json`
+
+不配置也能正常使用，只是聊天记录只在当前会话有效。
+
+### 添加和配置节点
+
+1. 从节点面板的 "AI dev copilot" 分类拖拽 "dev copilot" 节点到画布
 2. 双击节点进行配置
 
-### 2. 基本配置
+主要配置项：
 
-#### LLM 提供商设置
+**AI 服务设置**
 
-- **Provider**: 选择 AI 提供商（openai、google、deepseek）
-- **Model**: 指定模型名称（如：gpt-4、gemini-1.5-pro、deepseek-chat）
-- **API Key**: 输入对应提供商的 API 密钥（将安全存储）
-- **Temperature**: 控制随机性（0.0 = 确定性，2.0 = 非常创意）。编程任务建议使用 0.0-0.3
-- **Max Tokens**: 最大响应长度。编程任务：代码片段 1000-2000，复杂解决方案 3000-4000
-- **Tool Call Limit**: 工具调用最大轮数，防止无限循环。复杂任务使用 8-15
+- Provider: 选择 AI 提供商 (openai/google/deepseek)
+- Model: 模型名称 (如 gpt-4, gemini-2.5-pro, deepseek-chat)
+- API Key: 对应服务的 API 密钥
+- Temperature: 随机性控制 (0-2, 编程建议用 0.1-0.3)
+- Max Tokens: 最大回复长度 (建议 2000-4000)
+- Tool Call Limit: 工具调用轮数限制 (建议 10-15)
 
-#### MCP 服务器设置（可选）
+**MCP 服务器设置** (可选)
 
-- **MCP Command**: MCP 服务器启动命令（default：npx @supcon-international/node-red-mcp-server）
-- **Arguments**: 可选的命令行参数，用空格分隔
-- **Environment Variables**: 可选的环境变量，格式：KEY=value，多个用逗号分隔
-- **System Prompt**: 自定义 AI 交互的系统提示词
+- MCP Command: 服务器启动命令 (默认: `npx @supcon-international/node-red-mcp-server`)
+- Arguments: 命令行参数
+- Environment Variables: 环境变量 (格式: KEY=value,KEY2=value2)
+- System Prompt: 自定义系统提示词
 
-### 3. 示例配置
+### 配置示例
 
-#### OpenAI 配置
+**OpenAI 配置**
 
 ```
 Provider: openai
 Model: gpt-4
-API Key: sk-...（你的OpenAI API密钥）
+API Key: sk-xxx...
 Temperature: 0.1
 Max Tokens: 2000
-Tool Call Limit: 10
 ```
 
-#### DeepSeek 配置
+**Google Gemini 配置**
+
+```
+Provider: google
+Model: gemini-2.5-pro
+API Key: AIxxx...
+Temperature: 0.1
+Max Tokens: 2000
+```
+
+**DeepSeek 配置**
 
 ```
 Provider: deepseek
 Model: deepseek-chat
-API Key: sk-...（你的DeepSeek API密钥）
+API Key: sk-xxx...
 Temperature: 0.1
 Max Tokens: 2000
-Tool Call Limit: 10
-```
-
-#### Google 配置
-
-```
-Provider: google
-Model: gemini-1.5-pro
-API Key: ...（你的Google API密钥）
-Temperature: 0.1
-Max Tokens: 2000
-Tool Call Limit: 10
-```
-
-#### 使用 MCP 服务器
-
-```
-MCP Command: npx @supcon-international/node-red-mcp-server
-Arguments: --port 3000 --verbose
-Environment Variables: API_KEY=xxx,DEBUG=true
-System Prompt: You are a Node-RED development assistant with MCP tools access.
 ```
 
 ## 使用方法
 
 ### 侧边栏聊天
 
-1. 配置完节点后，点击 Node-RED 右侧的"Dev Copilot"侧边栏标签
-2. 从下拉菜单选择要使用的 Dev Copilot 节点（上次的选择会自动记住）
-3. 在输入框中输入问题，按 Enter 发送
-4. AI 将提供针对性的开发建议和代码示例
+1. 配置好节点后，点击右侧的 "Dev Copilot" 标签
+2. 选择要使用的节点（会记住上次的选择）
+3. 输入问题，按回车发送
+4. AI 会自动调用 MCP 工具来协助开发工作
 
-**增强功能：**
+聊天记录会自动保存，页面刷新后会恢复。使用 "Clear" 按钮可以清除所有记录。
 
-- 💾 **持久化历史**: 您的聊天对话会自动保存，再次访问时会自动恢复
-- 🔄 **自动恢复**: 页面刷新不会丢失对话内容，一切从上次中断的地方继续
-- 🎯 **智能选择**: 您偏好的节点选择会在各次会话中被记住
-- 🗑️ **轻松清理**: 使用红色的"Clear"按钮可以删除当前节点的聊天记录
+### 作为 Flow 节点
 
-### 流程集成
-
-Dev Copilot 节点也可以作为普通的 Node-RED 节点使用：
+也可以在 Flow 中作为普通节点使用：
 
 ```javascript
-// 输入消息格式
-msg = {
-    payload: "How to create a HTTP request node in Node-RED?",
+// 输入格式
+{
+    payload: "如何创建 HTTP 请求节点？",
     history: [  // 可选的对话历史
-        {role: "user", content: "Previous question"},
-        {role: "assistant", content: "Previous answer"}
+        {role: "user", content: "上一个问题"},
+        {role: "assistant", content: "上一个回答"}
     ]
 }
 
-// 输出消息格式
-msg = {
-    payload: "AI response text",
-    llm_config: {
-        provider: "openai",
-        model: "gpt-4",
-        system_prompt: "..."
-    },
+// 输出格式
+{
+    payload: "AI 的回答",
+    llm_config: { provider: "openai", model: "gpt-4", ... },
     mcp_available: true,
-    mcp_tools: [...]  // 可用的MCP工具列表
+    mcp_tools: [...]  // 可用的 MCP 工具列表
 }
 ```
 
 ## MCP 集成
 
-### 支持的 MCP 功能
+支持标准的 MCP 功能：
 
-- ✅ **Tools**: 调用 MCP 服务器提供的工具
-- ✅ **Resources**: 访问 MCP 服务器的资源
-- ✅ **Prompts**: 使用 MCP 服务器的提示模板
-- ✅ **Stdio Transport**: 通过 stdio 与 MCP 服务器通信
+- Tools: 调用 MCP 服务器提供的工具
+- Resources: 访问 MCP 服务器的资源
+- Prompts: 使用 MCP 服务器的提示模板
+- Stdio Transport: 通过标准输入输出与 MCP 服务器通信
 
-### NODE-RED MCP 服务器
+推荐搭配使用我们开发的 Node-RED MCP 服务器：
 
 ```bash
-# SUPCON Node-RED MCP 服务器（推荐）
 npx @supcon-international/node-red-mcp-server
 ```
 
-## API 参考
+## API 接口
 
-### HTTP 端点
+插件提供以下 HTTP 接口：
 
-- `GET /dev-copilot/sidebar` - 获取侧边栏 HTML
+- `GET /dev-copilot/sidebar` - 获取侧边栏页面
 - `POST /dev-copilot/chat` - 发送聊天消息
 - `GET /dev-copilot/nodes` - 获取可用节点列表
 
-### 节点配置属性
-
-| 属性          | 类型        | 必填 | 描述                                   |
-| ------------- | ----------- | ---- | -------------------------------------- |
-| name          | string      | 否   | 节点显示名称                           |
-| provider      | string      | 是   | LLM 提供商（openai、google、deepseek） |
-| model         | string      | 是   | 模型名称（如：gpt-4、gemini-1.5-pro）  |
-| apiKey        | credentials | 是   | 选定提供商的 API 密钥                  |
-| temperature   | number      | 是   | 控制随机性（0.0-2.0，默认：0.1）       |
-| maxTokens     | number      | 是   | 最大响应长度（100-8000，默认：2000）   |
-| toolCallLimit | number      | 是   | 工具调用最大轮数（1-20，默认：10）     |
-| mcpCommand    | string      | 否   | MCP 服务器启动命令                     |
-| mcpArgs       | string      | 否   | MCP 服务器命令行参数                   |
-| mcpEnv        | string      | 否   | 环境变量（KEY=value,KEY2=value2）      |
-| systemPrompt  | string      | 否   | 自定义 AI 交互的系统提示词             |
-
-## 开发
+## 开发相关
 
 ### 项目结构
 
 ```
-node-red-sidebar-dev-copilot/
-├── package.json              # NPM包配置
+node-red-dev-copilot/
+├── package.json              # 包配置
 ├── nodes/
 │   ├── dev-copilot.js       # 节点后端逻辑
-│   └── dev-copilot.html     # 节点前端配置
+│   └── dev-copilot.html     # 节点前端和侧边栏注册
 ├── public/
 │   └── sidebar.html         # 侧边栏界面
 ├── mcp/
-│   └── mcp-client.js        # MCP客户端辅助类
-└── README.md                # 说明文档
+│   └── mcp-client.js        # MCP 客户端
+└── README.md                # 文档
 ```
 
 ### 本地开发
 
-1. 克隆项目：
-
 ```bash
-git clone https://github.com/supcon-international/node-red-sidebar-dev-copilot.git
-cd node-red-sidebar-dev-copilot
-```
-
-2. 安装依赖：
-
-```bash
+git clone https://github.com/supcon-international/node-red-dev-copilot.git
+cd node-red-dev-copilot
 npm install
-```
 
-3. 链接到 Node-RED：
-
-```bash
+# 链接到 Node-RED
 cd ~/.node-red
-npm link /path/to/node-red-sidebar-dev-copilot
+npm link /path/to/node-red-dev-copilot
 ```
 
-4. 重启 Node-RED 进行测试
+然后重启 Node-RED 进行测试。
 
-### 测试 MCP 连接
+## 常见问题
 
-使用 MCP Inspector 测试服务器连接：
-https://github.com/modelcontextprotocol/inspector
+**侧边栏不显示**
 
-## 故障排除
+- 检查 Node-RED 版本 >= 3.0.0
+- 确认插件安装正确
+- 查看浏览器控制台是否有错误
 
-### 常见问题
+**MCP 连接失败**
 
-1. **侧边栏不显示**
+- 检查 MCP 服务器路径
+- 验证参数格式是否正确
+- 可以用 [MCP Inspector](https://github.com/modelcontextprotocol/inspector) 测试
 
-   - 检查 Node-RED 版本是否>=3.0.0
-   - 确认插件正确安装
-   - 查看浏览器控制台错误信息
+**API 调用失败**
 
-2. **MCP 连接失败**
+- 确认 API 密钥有效
+- 检查网络连接
+- 验证模型名称正确
+- 确认 API 余额充足
 
-   - 验证 MCP 服务器路径是否正确
-   - 检查服务器参数格式
-   - 使用 MCP Inspector 测试服务器
+**聊天记录不保存**
 
-3. **API 调用失败**
+- 检查 settings.js 中的 contextStorage 配置
+- 确认 Node-RED 对 context 目录有写权限
+- 修改配置后需要重启 Node-RED
 
-   - 确认 API 密钥有效
-   - 检查网络连接
-   - 验证模型名称正确
-   - 检查 API 配额是否充足
-
-4. **聊天记录未保存**
-   - 验证 Node-RED context 存储是否正确配置
-   - 检查 Node-RED settings.js 中是否启用了 contextStorage
-   - 确保 Node-RED 对数据目录有写权限
-   - 查看 Node-RED 日志中的 context 存储错误
-
-### 调试日志
-
-启用 Node-RED 调试日志：
+### 查看日志
 
 ```bash
-DEBUG=* node-red
+# 查看 Node-RED 日志
+tail -f ~/.node-red/node-red.log
+
+# 启用详细日志
+DEBUG=node-red:* node-red
 ```
 
-查看 Dev Copilot 相关日志：
+## 后续计划
 
-```bash
-DEBUG=node-red-sidebar-dev-copilot:* node-red
-```
+- 优化长对话的处理，避免响应变慢
+- 添加 API 使用统计功能
+- 改进缓存机制，减少重复调用
+- 支持更多 MCP 服务器
 
-## 贡献
+## 参与贡献
 
-欢迎提交 Issue 和 Pull Request！
+欢迎提交 Issue 和 Pull Request。
 
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送分支 (`git push origin feature/amazing-feature`)
+标准流程：
+
+1. Fork 这个项目
+2. 创建功能分支 (`git checkout -b feature/new-feature`)
+3. 提交修改 (`git commit -m 'Add some feature'`)
+4. 推送到分支 (`git push origin feature/new-feature`)
 5. 创建 Pull Request
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+MIT License - 详见 [LICENSE](LICENSE) 文件
 
-## 相关链接
+## 技术支持
 
-- [Node-RED 官网](https://nodered.org/)
-- [Model Context Protocol](https://modelcontextprotocol.io/)
-- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [SUPCON 国际](https://www.supcon.com/)
+遇到问题可以：
 
-## 支持
-
-如有问题，请：
-
-1. 查看[文档](README.md)
-2. 搜索[已有 Issues](https://github.com/supcon-international/node-red-sidebar-dev-copilot/issues)
-3. 创建新 Issue 描述问题
-4. 联系 SUPCON 技术支持
+1. 查看这份文档和 [英文文档](README.md)
+2. 搜索 [已有的 Issues](https://github.com/supcon-international/node-red-sidebar-dev-copilot/issues)
+3. 创建新的 Issue 描述问题
 
 ---
-
-**Made with ❤️ by SUPCON International**

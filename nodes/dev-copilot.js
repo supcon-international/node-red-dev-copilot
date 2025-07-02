@@ -37,8 +37,6 @@ module.exports = function (RED) {
       }
 
       try {
-        node.log(`🔧 Initializing ${node.provider} SDK client...`);
-
         switch (node.provider.toLowerCase()) {
           case "openai":
             node.openaiClient = new OpenAI({
@@ -59,8 +57,6 @@ module.exports = function (RED) {
           default:
             throw new Error(`Unsupported provider: ${node.provider}`);
         }
-
-        node.log(`✅ ${node.provider} SDK client initialized successfully`);
       } catch (error) {
         node.error(
           `❌ ${node.provider} SDK client initialization failed: ${error.message}`
@@ -107,15 +103,6 @@ module.exports = function (RED) {
           }
         }
 
-        node.log(`🔌 Initializing MCP connection:`);
-        node.log(`   Command: ${node.mcpCommand}`);
-        if (args.length > 0) {
-          node.log(`   Arguments: ${args.join(" ")}`);
-        }
-        if (Object.keys(env).length > 0) {
-          node.log(`   Environment variables: ${JSON.stringify(env)}`);
-        }
-
         // Connect to MCP server
         const success = await node.mcpClient.connect(
           node.mcpCommand,
@@ -126,10 +113,6 @@ module.exports = function (RED) {
         if (success) {
           // Get server information
           const serverInfo = await node.mcpClient.getServerInfo();
-
-          node.log(`✅ MCP server connected successfully`);
-          node.log(`   Tools count: ${serverInfo.tools.length}`);
-          node.log(`   Resources count: ${serverInfo.resources.length}`);
 
           node.status({
             fill: "green",
@@ -157,7 +140,6 @@ module.exports = function (RED) {
       if (node.mcpClient && node.mcpClient.isClientConnected()) {
         try {
           await node.mcpClient.cleanup();
-          node.log("🔌 MCP server connection disconnected");
           node.status({ fill: "grey", shape: "ring", text: "disconnected" });
         } catch (error) {
           node.error("Error disconnecting MCP server: " + error.message);
@@ -184,12 +166,6 @@ module.exports = function (RED) {
               },
             });
           }
-
-          node.log(
-            `🔧 Found ${tools.length} MCP tools: ${mcpTools
-              .map((t) => t.name)
-              .join(", ")}`
-          );
         } catch (error) {
           node.warn("Failed to get MCP tools list: " + error.message);
         }
@@ -261,8 +237,6 @@ module.exports = function (RED) {
         // Get available MCP tools
         const availableTools = await node.getMCPTools();
 
-        node.log(`🤖 Calling ${node.provider} API, model: ${node.model}`);
-
         switch (node.provider.toLowerCase()) {
           case "openai":
           case "deepseek":
@@ -304,7 +278,6 @@ module.exports = function (RED) {
 
       // Execute up to configured rounds of tool calls to prevent infinite loops
       const maxRounds = node.toolCallLimit || 10;
-      node.log(`🔄 Starting tool call loop - max rounds: ${maxRounds}`);
 
       let round = 0;
       let hitLimit = false;
@@ -321,11 +294,6 @@ module.exports = function (RED) {
         if (tools && tools.length > 0) {
           requestParams.tools = tools;
           requestParams.tool_choice = "auto"; // Enable automatic function calling
-          node.log(
-            `📤 OpenAI API request with ${tools.length} tools (automatic function calling enabled)`
-          );
-        } else {
-          node.log(`📤 OpenAI API simple call - no tools`);
         }
 
         const response = await node.openaiClient.chat.completions.create(
@@ -338,12 +306,6 @@ module.exports = function (RED) {
 
         // Check if there are tool calls
         if (message.tool_calls && message.tool_calls.length > 0) {
-          node.log(
-            `🔧 OpenAI API detected ${
-              message.tool_calls.length
-            } tool calls (round ${round + 1}/${maxRounds})`
-          );
-
           // Execute tool calls
           for (const toolCall of message.tool_calls) {
             const toolName = toolCall.function.name;
@@ -426,8 +388,6 @@ module.exports = function (RED) {
 
       // If no tools, use simple call
       if (!tools || tools.length === 0) {
-        node.log(`📤 Google API simple call - no tools`);
-
         try {
           const response = await node.googleClient.models.generateContent({
             model: node.model,
@@ -457,15 +417,10 @@ module.exports = function (RED) {
         parameters: tool.function.parameters,
       }));
 
-      node.log(
-        `📤 Google API request with tools - messages: ${conversationMessages.length}, tools: ${tools.length}`
-      );
-
       let lastResponse = null;
 
       // Execute up to configured rounds of tool calls to prevent infinite loops
       const maxRounds = node.toolCallLimit || 10;
-      node.log(`🔄 Starting Google tool call loop - max rounds: ${maxRounds}`);
 
       let round = 0;
       let hitLimit = false;
@@ -511,17 +466,11 @@ module.exports = function (RED) {
               }
             }
           } catch (error) {
-            node.log("🔍 Google API: No function calls detected");
             functionCalls = [];
           }
 
           if (functionCalls && functionCalls.length > 0) {
             // Has tool calls
-            node.log(
-              `🔧 Google API detected ${
-                functionCalls.length
-              } tool calls (round ${round + 1}/${maxRounds})`
-            );
 
             // Add model response to conversation
             const modelContent = {
@@ -748,16 +697,10 @@ module.exports = function (RED) {
     try {
       const { message, nodeId, history } = req.body;
 
-      // Debug information
-      console.log("🔍 Chat API debug info:");
-      console.log(`   Requested nodeId: ${nodeId}`);
-      console.log(`   Message content: ${message}`);
-
       // If no nodeId provided, try to find available node
       let node;
       if (nodeId) {
         node = RED.nodes.getNode(nodeId);
-        console.log(`   Node lookup result: ${node ? "found" : "not found"}`);
 
         if (!node) {
           // Provide more detailed debug information
@@ -772,8 +715,6 @@ module.exports = function (RED) {
               });
             }
           });
-
-          console.log("   All dev-copilot node status:", allNodes);
 
           return res.status(404).json({
             error: `Selected node (ID: ${nodeId}) not found.\n\nPossible reasons:\n1. Node not properly deployed - please click "Deploy" button\n2. Node configuration has errors - please check node configuration\n3. Node ID expired - please reselect node\n\nDebug info:\nCurrent available nodes: ${
@@ -807,7 +748,6 @@ module.exports = function (RED) {
           });
         }
         node = foundNode;
-        console.log("   Auto-selected node:", node.name || node.id);
       }
 
       // Check node configuration
@@ -919,14 +859,6 @@ module.exports = function (RED) {
       // Use the node's context to access configured storage (localfilesystem)
       const data = contextAccessNode.context().global.get(key) || null;
 
-      console.log(
-        `📖 Retrieved context data: ${key} = ${
-          data ? typeof data : "null"
-        } (using ${
-          RED.settings.contextStorage?.default?.module || "memory"
-        } storage)`
-      );
-
       res.json({
         success: true,
         data: data,
@@ -973,12 +905,6 @@ module.exports = function (RED) {
       // Use the node's context to save to configured storage (localfilesystem)
       contextAccessNode.context().global.set(key, data);
 
-      console.log(
-        `💾 Context data saved: ${key} (${data ? typeof data : "null"}) to ${
-          RED.settings.contextStorage?.default?.module || "memory"
-        } storage`
-      );
-
       res.json({
         success: true,
         message: "Context data saved successfully",
@@ -1024,12 +950,6 @@ module.exports = function (RED) {
 
       // Use the node's context to delete from configured storage (localfilesystem)
       contextAccessNode.context().global.set(key, undefined);
-
-      console.log(
-        `🗑️ Context data deleted: ${key} from ${
-          RED.settings.contextStorage?.default?.module || "memory"
-        } storage`
-      );
 
       res.json({
         success: true,
