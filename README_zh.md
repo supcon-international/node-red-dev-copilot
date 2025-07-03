@@ -2,7 +2,7 @@
 
 一个为 Node-RED 开发的 AI 编程助手侧边栏插件，支持 MCP (Model Context Protocol) 协议。
 
-![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![npm version](https://img.shields.io/npm/v/@supcon-international/node-red-dev-copilot) ![npm downloads](https://img.shields.io/npm/dm/@supcon-international/node-red-dev-copilot) ![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 [English](README.md)
 

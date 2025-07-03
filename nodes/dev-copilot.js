@@ -15,9 +15,9 @@ module.exports = function (RED) {
     // Get configuration properties
     node.provider = config.provider || "openai";
     node.model = config.model || "gpt-4";
-    node.temperature = config.temperature || 0.1;
-    node.maxTokens = config.maxTokens || 2000;
-    node.toolCallLimit = config.toolCallLimit || 10;
+    node.temperature = parseFloat(config.temperature) || 0.1;
+    node.maxTokens = parseInt(config.maxTokens) || 2000;
+    node.toolCallLimit = parseInt(config.toolCallLimit) || 10;
     node.mcpCommand =
       config.mcpCommand || "npx @supcon-international/node-red-mcp-server";
     node.mcpArgs = config.mcpArgs || "";
