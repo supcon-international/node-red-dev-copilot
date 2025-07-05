@@ -17,6 +17,34 @@ An AI programming assistant sidebar plugin for Node-RED with MCP (Model Context 
 - **Conversation History**: Supports multi-turn conversations with records saved in Node-RED global storage
 - **Flow Node**: Can be used as a regular node in flows besides the sidebar
 
+## Screenshots
+
+### Sidebar Chat Interface
+
+Chat directly with the AI assistant in the Node-RED editor's right panel for development assistance:
+
+![Dev Copilot Chat Interface](images/cd18ad77e46b25e3e97ed5dfce4e3bfe3c041f7247c54003215a5c74815d70a1.png)
+
+**Key Features:**
+
+- **Smart Conversations**: Ask Node-RED development questions directly
+- **Tool Integration**: AI automatically calls MCP tools to assist development
+- **Chat History**: Conversations are automatically saved with multi-turn support
+- **Node Switching**: Switch freely between different configured LLM nodes
+
+### Node Configuration Interface
+
+Simple configuration to get started, supporting multiple mainstream AI services:
+
+![Dev Copilot Node Configuration](images/c7aa1d15e320912cc77066da9f1250137670aa6c43d50444e576aec4b5eec900.png)
+
+**Configuration Highlights:**
+
+- **AI Services**: Supports OpenAI, Google Gemini, DeepSeek
+- **Secure Storage**: API keys stored securely via Node-RED's credential system
+- **Parameter Tuning**: Adjustable temperature, max tokens, and other parameters
+- **MCP Integration**: default node-red mcp
+
 ## Quick Start
 
 ### Installation Methods
