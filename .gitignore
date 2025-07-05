@@ -91,6 +91,10 @@ tests/
 
 # Personal
 TODO.md
+note.md
 
 # package-lock.json
 package-lock.json
+
+#cursor
+.cursorrules

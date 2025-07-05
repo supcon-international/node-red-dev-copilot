@@ -3,6 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+
       .dev-copilot-container {
         height: 100%;
         display: flex;
@@ -10,6 +17,11 @@
         padding: 6px;
         box-sizing: border-box;
         overflow: hidden;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
       }
 
       .dev-copilot-header {
@@ -46,15 +58,15 @@
 
       .dev-copilot-messages {
         flex: 1;
-        min-height: 900px;
-        max-height: 1000px;
         overflow-y: auto;
+        overflow-x: hidden;
         border: 1px solid #ddd;
         border-radius: 3px;
         padding: 8px;
         margin-bottom: 6px;
         background: #fafafa;
         scroll-behavior: smooth;
+        min-height: 0;
       }
 
       .dev-copilot-messages::after {
@@ -163,11 +175,12 @@
         padding: 6px 8px;
         border: 1px solid #ccc;
         border-radius: 3px;
-        resize: vertical;
+        resize: none;
         min-height: 32px;
-        max-height: 80px;
+        max-height: 60px;
         font-family: inherit;
         font-size: 13px;
+        overflow-y: auto;
       }
 
       .dev-copilot-send {
@@ -189,24 +202,12 @@
         background: #6c757d;
         cursor: not-allowed;
       }
-      /* 
-      .dev-copilot-info {
-        margin-top: 4px;
-        padding: 4px 6px;
-        background: #d1ecf1;
-        border: 1px solid #bee5eb;
-        border-radius: 3px;
-        font-size: 12px;
-        color: #0c5460;
-        flex-shrink: 0;
-        text-align: center;
-      } */
-
       .dev-copilot-empty-state {
         text-align: center;
         color: #666;
         font-style: italic;
-        margin-top: 50px;
+        padding: 20px 10px;
+        margin-top: 20px;
       }
 
       .dev-copilot-title {
@@ -217,10 +218,11 @@
       }
 
       .dev-copilot-shortcuts {
-        font-size: 12px;
+        font-size: 11px;
         color: #666;
-        margin-top: 2px;
-        margin-bottom: 2px;
+        margin-top: 4px;
+        margin-bottom: 0;
+        padding-bottom: 4px;
         flex-shrink: 0;
         text-align: center;
       }
@@ -275,11 +277,6 @@
         </div>
       </div>
 
-      <!-- Info area -->
-      <!-- <div class="dev-copilot-info">
-        <strong>Ready:</strong> AI Assistant with MCP Tools
-      </div>
-    </div> -->
 
     <script>
       // Auto-adjust input box height
