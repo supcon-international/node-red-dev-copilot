@@ -9,6 +9,7 @@
 ## 主要功能
 
 - **多平台 AI 支持**: 支持 OpenAI、Google Gemini、DeepSeek 主流 AI 服务
+- **实时流式传输**: 基于服务器发送事件(SSE)的流式响应，提供即时反馈，默认开启
 - **MCP 协议集成**: 自动发现和调用 MCP 工具，结合我们的 Node-RED MCP 服务器，为 Node-RED 开发提供强大的 AI 辅助能力
 - **智能工具调用**: AI 可以根据需要自动选择和执行相关工具
 - **侧边栏界面**: 直接在 Node-RED 编辑器中使用，无需切换界面
@@ -23,7 +24,7 @@
 
 在 Node-RED 编辑器的右侧，您可以直接与 AI 助手进行对话，获得开发帮助：
 
-![Dev Copilot 对话窗口](images/cd18ad77e46b25e3e97ed5dfce4e3bfe3c041f7247c54003215a5c74815d70a1.png)
+![Dev Copilot 对话窗口](images/bb77688bf40a9a7f616c50d157021a481cb53a31da634905fdd0572042e48d2f.png)
 
 **主要特性:**
 
@@ -200,7 +201,8 @@ npx @supcon-international/node-red-mcp-server
 插件提供以下 HTTP 接口：
 
 - `GET /dev-copilot/sidebar` - 获取侧边栏页面
-- `POST /dev-copilot/chat` - 发送聊天消息
+- `POST /dev-copilot/chat` - 发送聊天消息 (非流式)
+- `POST /dev-copilot/chat-stream` - 发送聊天消息并支持服务器发送事件流式传输
 - `GET /dev-copilot/nodes` - 获取可用节点列表
 
 ## 开发相关

@@ -6,7 +6,7 @@
     defaults: {
       name: { value: "" },
       provider: { value: "openai", required: true },
-      model: { value: "gpt-4", required: true },
+      model: { value: "gpt-4.1", required: true },
       temperature: {
         value: 0.1,
         required: true,
@@ -45,7 +45,7 @@
     oneditprepare: function () {
       const providerPlaceholders = {
         openai: "e.g.: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o, gpt-4o-mini",
-        google: "e.g.: gemini-2.5-pro, gemini-2.5-flash, gemini-pro",
+        google: "e.g.: gemini-2.5-pro, gemini-2.5-flash",
         deepseek: "e.g.: deepseek-chat, deepseek-reasoner",
       };
 
@@ -564,6 +564,22 @@
 
       // Send message
       function sendMessage() {
+        const currentState = $("#dev-copilot-send").attr("data-state");
+
+        if (currentState === "generating") {
+          // User wants to stop generation
+          if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+          }
+
+          setSendButtonState("ready");
+          // Note: The actual stop handling is done in the catch blocks of
+          // sendStreamingMessage and sendTraditionalMessage functions
+          return;
+        }
+
+        // Normal send message flow
         const message = messageInput.val().trim();
         if (!message) {
           addMessageToUI("error", "Please enter message content");
@@ -579,6 +595,11 @@
           return;
         }
 
+        // Check if streaming mode is enabled
+        const streamModeEnabled = $("#dev-copilot-stream-toggle").is(
+          ":checked"
+        );
+
         // Add user message to interface and save
         addMessageToUI("user", message);
         addMessageAndSave("user", message); // Use new save function (async)
@@ -586,8 +607,28 @@
         // Clear input box
         messageInput.val("");
 
+        // Set button to generating state
+        setSendButtonState("generating");
+
+        if (streamModeEnabled) {
+          // Use streaming mode
+          sendStreamingMessage(message);
+        } else {
+          // Use traditional mode
+          sendTraditionalMessage(message);
+        }
+      }
+
+      // Traditional non-streaming message sending
+      function sendTraditionalMessage(message) {
         // Show loading state
-        addMessageToUI("assistant", "Thinking...", true);
+        const loadingMessage = addMessageToUI("assistant", "🤖 Thinking...", {
+          isLoading: true,
+        });
+
+        // Create abort controller for cancellation
+        currentAbortController = new AbortController();
+
         // Send request
         $.ajax({
           url: "/dev-copilot/chat",
@@ -598,9 +639,28 @@
             nodeId: currentNodeId,
             history: messageHistory, // Keep all history messages for API call
           }),
+          xhr: function () {
+            const xhr = new window.XMLHttpRequest();
+
+            // Handle abort signal
+            currentAbortController.signal.addEventListener("abort", () => {
+              xhr.abort();
+            });
+
+            return xhr;
+          },
           success: function (response) {
+            // Check if request was aborted
+            if (currentAbortController?.signal.aborted) {
+              return;
+            }
+
             // Remove loading message
-            $(".dev-copilot-loading").remove();
+            loadingMessage.remove();
+
+            // Reset button state
+            setSendButtonState("ready");
+            currentAbortController = null;
 
             if (response.success) {
               addMessageToUI("assistant", response.response);
@@ -610,7 +670,22 @@
             }
           },
           error: function (xhr) {
-            $(".dev-copilot-loading").remove();
+            // Check if request was aborted
+            if (currentAbortController?.signal.aborted) {
+              // User stopped the request - handle gracefully
+              loadingMessage.remove();
+              addMessageToUI("warning", "Response generation stopped by user.");
+              setSendButtonState("ready");
+              currentAbortController = null;
+              return;
+            }
+
+            // Remove loading message
+            loadingMessage.remove();
+
+            // Reset button state
+            setSendButtonState("ready");
+            currentAbortController = null;
 
             let errorMsg = "Network error";
             try {
@@ -625,78 +700,240 @@
         });
       }
 
-      // Add message to UI
-      function addMessageToUI(type, content, isLoading = false) {
-        const messageDiv = $(
-          '<div class="dev-copilot-message dev-copilot-' + type + '"></div>'
-        );
-        if (isLoading) {
-          messageDiv.addClass("dev-copilot-loading");
+      // Streaming message sending
+      async function sendStreamingMessage(message) {
+        let accumulatedContent = "";
+        let currentMessageElement = null;
+
+        // Create a new assistant message container for streaming
+        currentMessageElement = addMessageToUI("assistant", "🤖 Starting...", {
+          isStreaming: true,
+        });
+
+        // Create abort controller for cancellation
+        currentAbortController = new AbortController();
+
+        try {
+          // Use fetch API for streaming SSE
+          const response = await fetch("/dev-copilot/chat-stream", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message: message,
+              nodeId: currentNodeId,
+              history: messageHistory,
+            }),
+            signal: currentAbortController.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          // Read the stream
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { value, done } = await reader.read();
+
+            if (done) {
+              break;
+            }
+
+            // Check if aborted
+            if (currentAbortController.signal.aborted) {
+              break;
+            }
+
+            // Decode the chunk
+            const chunk = decoder.decode(value, { stream: true });
+
+            // Process SSE data
+            const lines = chunk.split("\n");
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const dataStr = line.substring(6).trim();
+                if (dataStr) {
+                  try {
+                    const data = JSON.parse(dataStr);
+                    handleStreamChunk(data);
+                  } catch (e) {
+                    console.warn("Failed to parse SSE data:", dataStr);
+                  }
+                }
+              }
+            }
+          }
+
+          // Final save and cleanup
+          if (!currentAbortController.signal.aborted) {
+            if (accumulatedContent) {
+              addMessageAndSave("assistant", accumulatedContent);
+            }
+
+            finishStreamingMessage(currentMessageElement);
+            setSendButtonState("ready");
+          }
+        } catch (error) {
+          if (error.name === "AbortError") {
+            // Request was aborted by user - preserve generated content
+            if (currentMessageElement && accumulatedContent.trim()) {
+              // Add stop indicator to existing content
+              const stoppedContent =
+                accumulatedContent + "\n\n⚠️ Generation stopped by user";
+              updateMessageContent(currentMessageElement, stoppedContent);
+              finishStreamingMessage(currentMessageElement);
+
+              // Save the partial content
+              addMessageAndSave("assistant", accumulatedContent);
+            } else if (currentMessageElement) {
+              // No content generated, remove the empty message
+              currentMessageElement.remove();
+              addMessageToUI("warning", "Response generation stopped by user.");
+            }
+            setSendButtonState("ready");
+            return;
+          }
+
+          console.error("Stream request failed:", error);
+
+          // Remove the streaming message element
+          if (currentMessageElement) {
+            currentMessageElement.remove();
+          }
+
+          // Show error
+          addMessageToUI("error", `Streaming failed: ${error.message}`);
+          setSendButtonState("ready");
+        } finally {
+          currentAbortController = null;
         }
 
-        // Set styles and handle content based on message type
-        if (type === "info") {
-          messageDiv.css({
-            "background-color": "#e3f2fd",
-            "border-left": "4px solid #2196f3",
-            padding: "12px",
-            margin: "8px 0",
-            "border-radius": "4px",
-            "white-space": "pre-line",
-            "font-size": "14px",
-            "line-height": "1.4",
-          });
-        } else if (type === "warning") {
-          messageDiv.css({
-            "background-color": "#fff3e0",
-            "border-left": "4px solid #ff9800",
-            padding: "12px",
-            margin: "8px 0",
-            "border-radius": "4px",
-            "white-space": "pre-line",
-            "font-size": "14px",
-            "line-height": "1.4",
-            color: "#e65100",
-          });
-        } else if (type === "error") {
-          messageDiv.css({
-            "background-color": "#ffebee",
-            "border-left": "4px solid #f44336",
-            padding: "12px",
-            margin: "8px 0",
-            "border-radius": "4px",
-            "white-space": "pre-line",
-            color: "#c62828",
-          });
-        } else if (type === "user") {
-          messageDiv.css({
-            "background-color": "#007acc",
-            color: "#ffffff",
-            padding: "8px 12px",
-            margin: "4px 0",
-            "border-radius": "12px",
-            "text-align": "right",
-            "margin-left": "20%",
-            "font-weight": "500",
-            "box-shadow": "0 1px 2px rgba(0, 0, 0, 0.1)",
-          });
-        } else if (type === "assistant") {
-          messageDiv.css({
-            "background-color": "#f8f9fa",
-            color: "#333333",
-            padding: "8px 12px",
-            margin: "4px 0",
-            "border-radius": "12px",
-            "margin-right": "20%",
-            "white-space": "pre-line",
-            border: "1px solid #e9ecef",
-            "box-shadow": "0 1px 2px rgba(0, 0, 0, 0.05)",
-          });
-        }
+        // Handle individual stream chunks
+        function handleStreamChunk(data) {
+          switch (data.type) {
+            case "start":
+              updateMessageContent(currentMessageElement, "🤖 Starting...");
+              break;
 
+            case "content":
+              accumulatedContent += data.content;
+              updateMessageContent(currentMessageElement, accumulatedContent);
+              break;
+
+            case "tool":
+              if (accumulatedContent.trim()) {
+                accumulatedContent += "\n\n" + data.content + "\n";
+              } else {
+                accumulatedContent += data.content + "\n";
+              }
+              updateMessageContent(currentMessageElement, accumulatedContent);
+              break;
+
+            case "info":
+            case "warning":
+              if (accumulatedContent.trim()) {
+                accumulatedContent += "\n\n" + data.content;
+              } else {
+                accumulatedContent += data.content;
+              }
+              updateMessageContent(currentMessageElement, accumulatedContent);
+              break;
+
+            case "error":
+              if (accumulatedContent.trim()) {
+                accumulatedContent += "\n\n❌ " + data.content;
+              } else {
+                accumulatedContent += "❌ " + data.content;
+              }
+              updateMessageContent(currentMessageElement, accumulatedContent);
+              break;
+
+            case "end":
+              // Stream completed - will be handled in main try block
+              break;
+
+            default:
+              console.warn("Unknown stream chunk type:", data.type);
+          }
+        }
+      }
+
+      // Send button state management
+      let currentAbortController = null;
+
+      function setSendButtonState(state) {
+        const sendButton = $("#dev-copilot-send");
+        const sendIcon = sendButton.find(".send-icon");
+        const sendText = sendButton.find(".send-text");
+        const messageInput = $("#dev-copilot-input");
+
+        // Remove all state classes
+        sendButton.removeClass("generating");
+        sendButton.attr("data-state", state);
+
+        switch (state) {
+          case "ready":
+            sendIcon.text("▶");
+            sendText.text("Send");
+            sendButton.prop("disabled", false);
+            messageInput.prop("disabled", false);
+            break;
+
+          case "generating":
+            sendIcon.text("⏹");
+            sendText.text("Stop");
+            sendButton.addClass("generating");
+            sendButton.prop("disabled", false);
+            messageInput.prop("disabled", true);
+            break;
+
+          case "disabled":
+            sendIcon.text("▶");
+            sendText.text("Send");
+            sendButton.prop("disabled", true);
+            messageInput.prop("disabled", true);
+            break;
+        }
+      }
+
+      // Unified message UI function
+      function addMessageToUI(type, content, options = {}) {
+        const { isLoading = false, isStreaming = false } = options;
+
+        // Create message element with proper classes
+        const messageClasses = ["dev-copilot-message", type];
+        if (isLoading) messageClasses.push("loading");
+        if (isStreaming) messageClasses.push("streaming");
+
+        const messageDiv = $(`<div class="${messageClasses.join(" ")}"></div>`);
+
+        // Set content
         messageDiv.text(content);
+
+        // Append and scroll
         messageContainer.append(messageDiv);
         messageContainer.scrollTop(messageContainer[0].scrollHeight);
+
+        return messageDiv;
+      }
+
+      // Update message content (for streaming)
+      function updateMessageContent(messageElement, content) {
+        if (messageElement) {
+          messageElement.text(content);
+          messageContainer.scrollTop(messageContainer[0].scrollHeight);
+        }
+      }
+
+      // Remove streaming indicator when complete
+      function finishStreamingMessage(messageElement) {
+        if (messageElement) {
+          messageElement.removeClass("streaming");
+        }
       }
 
       // Load available nodes
@@ -915,7 +1152,11 @@ Unable to load available nodes. Please check:
       }
 
       // Event listeners
-      sendButton.on("click", sendMessage);
+      sendButton.on("click", function (e) {
+        e.preventDefault();
+        sendMessage();
+      });
+
       messageInput.on("keypress", function (e) {
         if (e.which === 13 && !e.shiftKey) {
           e.preventDefault();
@@ -950,6 +1191,24 @@ Unable to load available nodes. Please check:
 
       // Initialize clear button event listener
       clearButton.on("click", clearGlobalHistory);
+
+      // Initialize stream mode toggle event listener
+      const streamToggle = $("#dev-copilot-stream-toggle");
+      const streamStatus = $("#stream-status");
+
+      streamToggle.on("change", function () {
+        const isEnabled = $(this).is(":checked");
+        if (isEnabled) {
+          streamStatus.text("Real-time streaming enabled");
+          streamStatus.css("color", "#28a745");
+        } else {
+          streamStatus.text("Traditional mode enabled");
+          streamStatus.css("color", "#6c757d");
+        }
+      });
+
+      // Initialize send button state
+      setSendButtonState("ready");
     }
   })();
 </script>

@@ -94,67 +94,7 @@
         background: #a8a8a8;
       }
 
-      .dev-copilot-message {
-        margin-bottom: 15px;
-        padding: 8px 12px;
-        border-radius: 8px;
-        width: fit-content;
-        max-width: 85%;
-        word-wrap: break-word;
-        white-space: pre-wrap;
-        font-size: 13px;
-        line-height: 1.4;
-        display: block;
-        position: relative;
-      }
 
-      .dev-copilot-user {
-        background: #007bff;
-        color: white;
-        margin-left: auto;
-        margin-right: 0;
-        text-align: left;
-        float: right;
-        clear: both;
-        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
-      }
-
-      .dev-copilot-assistant {
-        background: #e9ecef;
-        color: #333;
-        margin-right: auto;
-        margin-left: 0;
-        float: left;
-        clear: both;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        border: 1px solid #dee2e6;
-      }
-
-      .dev-copilot-error {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
-        margin-right: auto;
-        margin-left: 0;
-        float: left;
-        clear: both;
-      }
-
-      .dev-copilot-loading {
-        animation: pulse 1.5s ease-in-out infinite;
-      }
-
-      @keyframes pulse {
-        0% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.5;
-        }
-        100% {
-          opacity: 1;
-        }
-      }
 
       .dev-copilot-content {
         flex: 1;
@@ -192,15 +132,182 @@
         cursor: pointer;
         font-size: 12px;
         white-space: nowrap;
+        position: relative;
+        transition: all 0.2s ease;
+        min-width: 70px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
       }
 
       .dev-copilot-send:hover {
         background: #218838;
+        transform: translateY(-1px);
       }
 
       .dev-copilot-send:disabled {
         background: #6c757d;
         cursor: not-allowed;
+        transform: none;
+      }
+
+      /* Status-aware send button states */
+      .dev-copilot-send.generating {
+        background: #dc3545;
+        cursor: pointer;
+      }
+
+      .dev-copilot-send.generating:hover {
+        background: #c82333;
+        transform: translateY(-1px);
+      }
+
+      /* Icon animations */
+      .dev-copilot-send .icon-sending {
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Improved message styles with consistent UI */
+      .dev-copilot-message {
+        margin-bottom: 15px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        width: fit-content;
+        max-width: 85%;
+        word-wrap: break-word;
+        word-break: break-word;
+        white-space: pre-wrap;
+        font-size: 13px;
+        line-height: 1.5;
+        display: block;
+        position: relative;
+        clear: both;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* User message styles */
+      .dev-copilot-message.user {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        margin-left: auto;
+        margin-right: 0;
+        text-align: left;
+        float: right;
+        box-shadow: 0 3px 12px rgba(0, 123, 255, 0.3);
+        border-bottom-right-radius: 4px;
+      }
+
+      /* Assistant message styles */
+      .dev-copilot-message.assistant {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        color: #333;
+        margin-right: auto;
+        margin-left: 0;
+        float: left;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+        border: 1px solid #dee2e6;
+        border-bottom-left-radius: 4px;
+      }
+
+      /* Streaming message styles (same as assistant) */
+      .dev-copilot-message.streaming {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        color: #333;
+        margin-right: auto;
+        margin-left: 0;
+        float: left;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+        border: 1px solid #dee2e6;
+        border-bottom-left-radius: 4px;
+        position: relative;
+      }
+
+      /* Streaming indicator */
+      .dev-copilot-message.streaming::after {
+        content: "●";
+        position: absolute;
+        bottom: 8px;
+        right: 10px;
+        color: #28a745;
+        animation: pulse 1.5s ease-in-out infinite;
+        font-size: 8px;
+      }
+
+      /* Error message styles */
+      .dev-copilot-message.error {
+        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        margin-right: auto;
+        margin-left: 0;
+        float: left;
+        box-shadow: 0 3px 12px rgba(220, 53, 69, 0.2);
+      }
+
+      /* Info message styles */
+      .dev-copilot-message.info {
+        background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+        border-left: 4px solid #2196f3;
+        color: #0d47a1;
+        margin: 12px 0;
+        float: none;
+        clear: both;
+        max-width: 100%;
+        box-shadow: 0 3px 12px rgba(33, 150, 243, 0.2);
+      }
+
+      /* Warning message styles */
+      .dev-copilot-message.warning {
+        background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+        border-left: 4px solid #ff9800;
+        color: #e65100;
+        margin: 12px 0;
+        float: none;
+        clear: both;
+        max-width: 100%;
+        box-shadow: 0 3px 12px rgba(255, 152, 0, 0.2);
+      }
+
+
+
+      /* Tool call indicator styling */
+      .dev-copilot-message:has-text("🔧 Calling tool") {
+        border-left: 3px solid #17a2b8;
+      }
+
+      /* Loading animation improvement */
+      .dev-copilot-message.loading {
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.6;
+        }
       }
       .dev-copilot-empty-state {
         text-align: center;
@@ -234,7 +341,7 @@
       <div class="dev-copilot-header">
         <div class="dev-copilot-title">AI Development Copilot</div>
 
-        <!-- Node selector and clear button -->
+        <!-- Node selector and controls -->
         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
           <select id="dev-copilot-node-select" class="dev-copilot-node-selector" style="flex: 1; margin-bottom: 0;">
             <option value=""> nodes...</option>
@@ -242,6 +349,15 @@
           <button id="dev-copilot-clear" class="dev-copilot-clear-btn" title="Clear all global chat history (shared across all nodes)">
             🗑️ Clear
           </button>
+        </div>
+        
+        <!-- Stream mode toggle -->
+        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 12px;">
+          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: #666;">
+            <input type="checkbox" id="dev-copilot-stream-toggle" checked style="margin: 0;">
+            <span>Stream mode</span>
+          </label>
+          <small style="color: #999; flex: 1; text-align: right;" id="stream-status">Real-time streaming enabled</small>
         </div>
 
       </div>
@@ -266,8 +382,9 @@
             placeholder="Ask me anything about development..."
             rows="1"
           ></textarea>
-          <button id="dev-copilot-send" class="dev-copilot-send">
-            <i class="fa fa-paper-plane"></i> Send
+          <button id="dev-copilot-send" class="dev-copilot-send" data-state="ready">
+            <span class="send-icon">▶</span>
+            <span class="send-text">Send</span>
           </button>
         </div>
 

@@ -14,7 +14,7 @@ module.exports = function (RED) {
 
     // Get configuration properties
     node.provider = config.provider || "openai";
-    node.model = config.model || "gpt-4";
+    node.model = config.model || "gpt-4.1";
     node.temperature = parseFloat(config.temperature) || 0.1;
     node.maxTokens = parseInt(config.maxTokens) || 2000;
     node.toolCallLimit = parseInt(config.toolCallLimit) || 10;
@@ -261,6 +261,60 @@ module.exports = function (RED) {
         // If API call fails, return error message instead of crashing
         return {
           content: `❌ LLM API call failed (${node.provider}): ${error.message}\n\nPlease check:\n1. API key is correct\n2. Network connection is working\n3. Model name is valid\n4. API quota is sufficient`,
+          error: true,
+        };
+      }
+    };
+
+    // Call LLM API with streaming support
+    node.callLLMStream = async function (messages, streamCallback) {
+      if (!node.apiKey) {
+        throw new Error(
+          `API key not configured, please set ${node.provider} API key in node configuration`
+        );
+      }
+
+      try {
+        // Get available MCP tools
+        const availableTools = await node.getMCPTools();
+
+        switch (node.provider.toLowerCase()) {
+          case "openai":
+          case "deepseek":
+            return await node.callOpenAIWithToolsStream(
+              messages,
+              availableTools,
+              streamCallback
+            );
+          case "google":
+            return await node.callGoogleWithToolsStream(
+              messages,
+              availableTools,
+              streamCallback
+            );
+
+          default:
+            throw new Error(`Unsupported LLM provider: ${node.provider}`);
+        }
+      } catch (error) {
+        node.error(
+          `LLM API streaming call failed (${node.provider}): ${error.message}`
+        );
+
+        const errorMessage = `❌ LLM API call failed (${node.provider}): ${error.message}\n\nPlease check:\n1. API key is correct\n2. Network connection is working\n3. Model name is valid\n4. API quota is sufficient`;
+
+        if (streamCallback) {
+          streamCallback({
+            type: "content",
+            content: errorMessage,
+          });
+          streamCallback({
+            type: "end",
+          });
+        }
+
+        return {
+          content: errorMessage,
           error: true,
         };
       }
@@ -574,6 +628,439 @@ module.exports = function (RED) {
       };
     };
 
+    // OpenAI API call with streaming support
+    node.callOpenAIWithToolsStream = async function (
+      messages,
+      tools,
+      streamCallback
+    ) {
+      if (!node.openaiClient) {
+        throw new Error("OpenAI client not initialized");
+      }
+
+      let conversationMessages = [...messages];
+      let finalContent = [];
+      let lastResponse = null;
+      let accumulatedContent = "";
+
+      // Execute up to configured rounds of tool calls to prevent infinite loops
+      const maxRounds = node.toolCallLimit || 10;
+
+      let round = 0;
+      let hitLimit = false;
+
+      for (round = 0; round < maxRounds; round++) {
+        const requestParams = {
+          model: node.model,
+          messages: conversationMessages,
+          temperature: node.temperature || 0.1,
+          max_tokens: node.maxTokens || 2000,
+          stream: true, // Enable streaming
+        };
+
+        // If tools are available, add them to the request with automatic function calling
+        if (tools && tools.length > 0) {
+          requestParams.tools = tools;
+          requestParams.tool_choice = "auto";
+        }
+
+        const stream = await node.openaiClient.chat.completions.create(
+          requestParams
+        );
+
+        let currentMessage = { content: "", tool_calls: [] };
+        let isToolCallRound = false;
+
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+
+          if (delta?.content) {
+            currentMessage.content += delta.content;
+            accumulatedContent += delta.content;
+
+            // Stream content to callback
+            if (streamCallback) {
+              streamCallback({
+                type: "content",
+                content: delta.content,
+              });
+            }
+          }
+
+          if (delta?.tool_calls) {
+            isToolCallRound = true;
+            // Handle tool calls - for simplicity, we'll collect them and process after stream ends
+            for (const toolCall of delta.tool_calls) {
+              if (!currentMessage.tool_calls[toolCall.index]) {
+                currentMessage.tool_calls[toolCall.index] = {
+                  id: toolCall.id || "",
+                  type: "function",
+                  function: { name: "", arguments: "" },
+                };
+              }
+
+              if (toolCall.function?.name) {
+                currentMessage.tool_calls[toolCall.index].function.name +=
+                  toolCall.function.name;
+              }
+              if (toolCall.function?.arguments) {
+                currentMessage.tool_calls[toolCall.index].function.arguments +=
+                  toolCall.function.arguments;
+              }
+            }
+          }
+        }
+
+        // Add message to conversation
+        conversationMessages.push({
+          role: "assistant",
+          content: currentMessage.content || null,
+          tool_calls:
+            currentMessage.tool_calls.length > 0
+              ? currentMessage.tool_calls
+              : undefined,
+        });
+
+        // Check if there are tool calls
+        if (isToolCallRound && currentMessage.tool_calls.length > 0) {
+          // Execute tool calls
+          for (const toolCall of currentMessage.tool_calls) {
+            const toolName = toolCall.function.name;
+            let toolArgs;
+
+            try {
+              toolArgs = JSON.parse(toolCall.function.arguments);
+            } catch (e) {
+              toolArgs = {};
+            }
+
+            const toolMessage = `🔧 Calling tool: ${toolName}`;
+            finalContent.push(toolMessage);
+
+            if (streamCallback) {
+              streamCallback({
+                type: "tool",
+                content: toolMessage,
+              });
+            }
+
+            try {
+              const toolResult = await node.executeMCPTool(toolName, toolArgs);
+              const formattedResult = node.formatToolResult(toolResult);
+
+              conversationMessages.push({
+                role: "tool",
+                tool_call_id: toolCall.id,
+                content: formattedResult,
+              });
+            } catch (error) {
+              const errorMessage = `❌ Tool call failed: ${error.message}`;
+              finalContent.push(errorMessage);
+
+              if (streamCallback) {
+                streamCallback({
+                  type: "error",
+                  content: errorMessage,
+                });
+              }
+
+              conversationMessages.push({
+                role: "tool",
+                tool_call_id: toolCall.id,
+                content: `Error: ${error.message}`,
+              });
+            }
+          }
+
+          continue;
+        } else {
+          finalContent.push(currentMessage.content);
+          break;
+        }
+      }
+
+      // Check if we hit the tool call limit
+      if (round >= maxRounds) {
+        hitLimit = true;
+        const limitMessage = `⚠️ Reached maximum tool calls (${maxRounds}), response may be incomplete`;
+        finalContent.push(limitMessage);
+
+        if (streamCallback) {
+          streamCallback({
+            type: "warning",
+            content: limitMessage,
+          });
+        }
+      }
+
+      // Signal end of stream
+      if (streamCallback) {
+        streamCallback({
+          type: "end",
+        });
+      }
+
+      return {
+        content: accumulatedContent,
+        usage: lastResponse ? lastResponse.usage : null,
+      };
+    };
+
+    // Google Gemini API call with streaming support
+    node.callGoogleWithToolsStream = async function (
+      messages,
+      tools,
+      streamCallback
+    ) {
+      if (!node.googleClient) {
+        throw new Error("Google client not initialized");
+      }
+
+      const systemInstruction = messages.find((m) => m.role === "system");
+      let conversationMessages = messages.filter((m) => m.role !== "system");
+      let accumulatedContent = "";
+
+      // Convert messages to Google format
+      const contents = conversationMessages.map((msg) => ({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content }],
+      }));
+
+      // If no tools, use simple streaming call
+      if (!tools || tools.length === 0) {
+        try {
+          const request = {
+            model: node.model,
+            contents: contents,
+            config: {
+              temperature: node.temperature || 0.1,
+              maxOutputTokens: node.maxTokens || 2000,
+              systemInstruction: systemInstruction
+                ? systemInstruction.content
+                : undefined,
+            },
+          };
+
+          const streamingResponse =
+            await node.googleClient.models.generateContentStream(request);
+
+          for await (const chunk of streamingResponse) {
+            const text = chunk.text;
+            if (text) {
+              accumulatedContent += text;
+
+              if (streamCallback) {
+                streamCallback({
+                  type: "content",
+                  content: text,
+                });
+              }
+            }
+          }
+
+          if (streamCallback) {
+            streamCallback({
+              type: "end",
+            });
+          }
+
+          return {
+            content: accumulatedContent,
+            usage: null,
+          };
+        } catch (error) {
+          throw new Error(`Google API streaming call failed: ${error.message}`);
+        }
+      }
+
+      // Convert tools to Google format (functionDeclarations)
+      const functionDeclarations = tools.map((tool) => ({
+        name: tool.function.name,
+        description: tool.function.description,
+        parameters: tool.function.parameters,
+      }));
+
+      let lastResponse = null;
+
+      // Execute up to configured rounds of tool calls to prevent infinite loops
+      const maxRounds = node.toolCallLimit || 10;
+
+      let round = 0;
+      let hitLimit = false;
+
+      for (round = 0; round < maxRounds; round++) {
+        try {
+          // Use the latest Gen AI SDK config format with streaming
+          const config = {
+            tools: [{ functionDeclarations: functionDeclarations }],
+            temperature: node.temperature || 0.1,
+            maxOutputTokens: node.maxTokens || 2000,
+            systemInstruction: systemInstruction
+              ? systemInstruction.content
+              : undefined,
+          };
+
+          const streamingResponse =
+            await node.googleClient.models.generateContentStream({
+              model: node.model,
+              contents: contents,
+              config: config,
+            });
+
+          let currentText = "";
+          let functionCalls = [];
+
+          for await (const chunk of streamingResponse) {
+            // Handle text content
+            if (chunk.text) {
+              currentText += chunk.text;
+              accumulatedContent += chunk.text;
+
+              if (streamCallback) {
+                streamCallback({
+                  type: "content",
+                  content: chunk.text,
+                });
+              }
+            }
+
+            // Check for function calls
+            if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+              functionCalls = chunk.functionCalls;
+            } else if (
+              chunk.candidates &&
+              chunk.candidates[0] &&
+              chunk.candidates[0].content
+            ) {
+              // Check for function calls in the content parts
+              const content = chunk.candidates[0].content;
+              if (content.parts) {
+                for (const part of content.parts) {
+                  if (part.functionCall) {
+                    functionCalls.push(part.functionCall);
+                  }
+                }
+              }
+            }
+          }
+
+          lastResponse = { usageMetadata: null }; // Placeholder for usage data
+
+          if (functionCalls && functionCalls.length > 0) {
+            // Has tool calls
+
+            // Add model response to conversation
+            const modelContent = {
+              role: "model",
+              parts: [],
+            };
+
+            // Add text response if available
+            if (currentText) {
+              modelContent.parts.push({ text: currentText });
+            }
+
+            // Add function calls
+            for (const functionCall of functionCalls) {
+              modelContent.parts.push({ functionCall: functionCall });
+            }
+
+            contents.push(modelContent);
+
+            const functionResponses = [];
+
+            for (const functionCall of functionCalls) {
+              const toolName = functionCall.name;
+              const toolArgs =
+                functionCall.args || functionCall.arguments || {};
+
+              const toolMessage = `🔧 Calling tool: ${toolName}`;
+
+              if (streamCallback) {
+                streamCallback({
+                  type: "tool",
+                  content: toolMessage,
+                });
+              }
+
+              try {
+                const toolResult = await node.executeMCPTool(
+                  toolName,
+                  toolArgs
+                );
+                const formattedResult = node.formatToolResult(toolResult);
+
+                functionResponses.push({
+                  functionResponse: {
+                    name: toolName,
+                    response: {
+                      result: formattedResult,
+                    },
+                  },
+                });
+              } catch (error) {
+                const errorMessage = `❌ Tool call failed: ${error.message}`;
+
+                if (streamCallback) {
+                  streamCallback({
+                    type: "error",
+                    content: errorMessage,
+                  });
+                }
+
+                functionResponses.push({
+                  functionResponse: {
+                    name: toolName,
+                    response: {
+                      error: error.message,
+                    },
+                  },
+                });
+              }
+            }
+
+            // Add tool results to conversation
+            contents.push({
+              role: "user",
+              parts: functionResponses,
+            });
+
+            continue;
+          } else {
+            // No tool calls, return final response
+            break;
+          }
+        } catch (error) {
+          throw new Error(`Google API streaming call failed: ${error.message}`);
+        }
+      }
+
+      // Check if we hit the tool call limit
+      if (round >= maxRounds) {
+        hitLimit = true;
+        const limitMessage = `⚠️ Reached maximum tool calls (${maxRounds}), response may be incomplete`;
+
+        if (streamCallback) {
+          streamCallback({
+            type: "warning",
+            content: limitMessage,
+          });
+        }
+      }
+
+      // Signal end of stream
+      if (streamCallback) {
+        streamCallback({
+          type: "end",
+        });
+      }
+
+      return {
+        content: accumulatedContent,
+        usage: lastResponse ? lastResponse.usageMetadata || null : null,
+      };
+    };
+
     // Process input messages
     node.on("input", async function (msg) {
       try {
@@ -790,6 +1277,118 @@ module.exports = function (RED) {
         success: false,
         error: error.message,
       });
+    }
+  });
+
+  // API endpoint: send message to copilot with streaming
+  RED.httpAdmin.post("/dev-copilot/chat-stream", async function (req, res) {
+    try {
+      const { message, nodeId, history } = req.body;
+
+      // Set headers for Server-Sent Events
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Cache-Control",
+      });
+
+      // Helper function to send SSE data
+      const sendSSE = (data) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      // If no nodeId provided, try to find available node
+      let node;
+      if (nodeId) {
+        node = RED.nodes.getNode(nodeId);
+
+        if (!node) {
+          sendSSE({
+            type: "error",
+            content: `Selected node (ID: ${nodeId}) not found. Please reselect node and try again.`,
+          });
+          res.end();
+          return;
+        }
+      } else {
+        // Find first available runtime dev-copilot node
+        let foundNode = null;
+        RED.nodes.eachNode(function (configNode) {
+          if (configNode.type === "dev-copilot" && !foundNode) {
+            const runtimeNode = RED.nodes.getNode(configNode.id);
+            if (runtimeNode) {
+              foundNode = runtimeNode;
+            }
+          }
+        });
+
+        if (!foundNode) {
+          sendSSE({
+            type: "error",
+            content:
+              "No available Dev Copilot nodes found. Please create and deploy a node first.",
+          });
+          res.end();
+          return;
+        }
+        node = foundNode;
+      }
+
+      // Check node configuration
+      if (!node.apiKey) {
+        sendSSE({
+          type: "error",
+          content: `Node configuration incomplete: missing ${node.provider} API key. Please configure the node.`,
+        });
+        res.end();
+        return;
+      }
+
+      // Build messages
+      const messages = [
+        {
+          role: "system",
+          content: node.systemPrompt || node.defaultSystemPrompt,
+        },
+      ];
+
+      if (history && Array.isArray(history)) {
+        messages.push(...history);
+      }
+
+      messages.push({
+        role: "user",
+        content: message,
+      });
+
+      // Send initial status
+      sendSSE({
+        type: "start",
+        content: "Starting response...",
+      });
+
+      // Call LLM with streaming
+      await node.callLLMStream(messages, (chunk) => {
+        sendSSE(chunk);
+      });
+
+      // Close connection
+      res.end();
+    } catch (error) {
+      try {
+        res.write(
+          `data: ${JSON.stringify({
+            type: "error",
+            content: `Stream error: ${error.message}`,
+          })}\n\n`
+        );
+        res.end();
+      } catch (writeError) {
+        // Connection might be closed
+        console.error("Error writing to stream:", writeError);
+      }
     }
   });
 

@@ -9,6 +9,7 @@ An AI programming assistant sidebar plugin for Node-RED with MCP (Model Context 
 ## Key Features
 
 - **Multi-Platform AI Support**: Works with OpenAI, Google Gemini, DeepSeek and other mainstream AI services
+- **Real-time Streaming**: Server-Sent Events (SSE) based streaming responses for immediate feedback,default true
 - **MCP Protocol Integration**: Auto-discovers and calls MCP tools, combined with our Node-RED MCP server for powerful AI assistance in Node-RED development
 - **Intelligent Tool Calling**: AI automatically selects and executes relevant tools as needed
 - **Sidebar Interface**: Use directly within the Node-RED editor without switching interfaces
@@ -23,7 +24,7 @@ An AI programming assistant sidebar plugin for Node-RED with MCP (Model Context 
 
 Chat directly with the AI assistant in the Node-RED editor's right panel for development assistance:
 
-![Dev Copilot Chat Interface](images/cd18ad77e46b25e3e97ed5dfce4e3bfe3c041f7247c54003215a5c74815d70a1.png)
+![Dev Copilot Chat Interface](images/bb77688bf40a9a7f616c50d157021a481cb53a31da634905fdd0572042e48d2f.png)
 
 **Key Features:**
 
@@ -201,7 +202,8 @@ npx @supcon-international/node-red-mcp-server
 The plugin provides the following HTTP interfaces:
 
 - `GET /dev-copilot/sidebar` - Get sidebar page
-- `POST /dev-copilot/chat` - Send chat message
+- `POST /dev-copilot/chat` - Send chat message (non-streaming)
+- `POST /dev-copilot/chat-stream` - Send chat message with Server-Sent Events streaming
 - `GET /dev-copilot/nodes` - Get available nodes list
 
 ## Development
