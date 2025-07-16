@@ -2,7 +2,7 @@
 
 An AI programming assistant sidebar plugin for Node-RED with MCP (Model Context Protocol) support.
 
-![npm version](https://img.shields.io/npm/v/@supcon-international/node-red-dev-copilot) ![npm downloads](https://img.shields.io/npm/dm/@supcon-international/node-red-dev-copilot) ![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+[![npm version](https://img.shields.io/npm/v/@supcon-international/node-red-dev-copilot)](https://www.npmjs.com/package/@supcon-international/node-red-dev-copilot) [![npm downloads](https://img.shields.io/npm/dm/@supcon-international/node-red-dev-copilot)](https://www.npmjs.com/package/@supcon-international/node-red-dev-copilot) [![npm total downloads](https://img.shields.io/npm/dt/@supcon-international/node-red-dev-copilot)](https://www.npmjs.com/package/@supcon-international/node-red-dev-copilot) ![Node-RED Dev Copilot](https://img.shields.io/badge/Node--RED-3.0%2B-red) ![MCP](https://img.shields.io/badge/MCP-Supported-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 [中文文档](README_zh.md)
 
