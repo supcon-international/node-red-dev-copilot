@@ -8,7 +8,7 @@ An AI programming assistant sidebar plugin for Node-RED with MCP (Model Context 
 
 ## Key Features
 
-- **Multi-Platform AI Support**: Works with OpenAI, Google Gemini, DeepSeek and other mainstream AI services
+- **Multi-Platform AI Support**: Works with OpenAI, Google Gemini, DeepSeek
 - **Real-time Streaming**: Server-Sent Events (SSE) based streaming responses for immediate feedback,default true
 - **MCP Protocol Integration**: Auto-discovers and calls MCP tools, combined with our Node-RED MCP server for powerful AI assistance in Node-RED development
 - **Intelligent Tool Calling**: AI automatically selects and executes relevant tools as needed
