@@ -18,8 +18,7 @@ module.exports = function (RED) {
     node.temperature = parseFloat(config.temperature) || 0.1;
     node.maxTokens = parseInt(config.maxTokens) || 2000;
     node.toolCallLimit = parseInt(config.toolCallLimit) || 10;
-    node.mcpCommand =
-      config.mcpCommand || "npx @supcon-international/node-red-mcp-server";
+    node.mcpCommand = config.mcpCommand || "";
     node.mcpArgs = config.mcpArgs || "";
     node.mcpEnv = config.mcpEnv || "";
     node.systemPrompt = config.systemPrompt || "";
