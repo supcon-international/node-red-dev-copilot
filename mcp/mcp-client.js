@@ -19,48 +19,20 @@ class MCPClientHelper {
 
   /**
    * Detect server configuration (simplified version)
-   * @param {string} serverPath - MCP server path
+   * @param {string} serverPath - MCP server command string
    * @returns {Object} Server configuration information
    */
   detectServerConfig(serverPath) {
-    // Handle NPX commands
-    if (serverPath.startsWith("npx ")) {
-      const parts = serverPath.split(" ");
-      return {
-        command: "npx",
-        args: parts[0] === "npx" ? parts.slice(1) : parts,
-        serverPath: serverPath,
-      };
-    }
+    // Parse command string directly
+    const parts = serverPath.trim().split(/\s+/);
+    const command = parts[0];
+    const args = parts.slice(1);
 
-    // Check if file exists
-    if (!fs.existsSync(serverPath)) {
-      throw new Error(`Server file does not exist: ${serverPath}`);
-    }
-
-    const ext = path.extname(serverPath).toLowerCase();
-    let command, args;
-
-    switch (ext) {
-      case ".py":
-        command = "python";
-        args = [serverPath];
-        break;
-      case ".js":
-        command = "node";
-        args = [serverPath];
-        break;
-      case ".jar":
-        command = "java";
-        args = ["-jar", serverPath];
-        break;
-      default:
-        // Try as executable
-        command = serverPath;
-        args = [];
-    }
-
-    return { command, args, serverPath };
+    return {
+      command: command,
+      args: args,
+      serverPath: serverPath,
+    };
   }
 
   /**
@@ -72,16 +44,7 @@ class MCPClientHelper {
    */
   async connect(command, args = [], customEnv = {}) {
     try {
-      // If it's a legacy call (first parameter is object or string containing paths), use compatibility mode
-      if (
-        typeof command === "object" ||
-        (typeof command === "string" &&
-          (command.includes("/") || command.includes("\\")))
-      ) {
-        return this.connectLegacy(command, args);
-      }
-
-      // Parse command, handle cases like "npx package"
+      // Parse command if it contains spaces
       let finalCommand, finalArgs;
       if (command.includes(" ")) {
         const parts = command.split(" ");
@@ -117,35 +80,6 @@ class MCPClientHelper {
       await this.getServerCapabilities();
 
       return true;
-    } catch (error) {
-      console.error("❌ MCP server connection failed:", error.message);
-      this.isConnected = false;
-      await this.cleanup();
-      return false;
-    }
-  }
-
-  /**
-   * Legacy connection method for backward compatibility
-   * @param {string|Object} serverConfig - Server path or configuration object
-   * @param {string[]} additionalArgs - Additional arguments
-   * @returns {Promise<boolean>} Whether connection was successful
-   */
-  async connectLegacy(serverConfig, additionalArgs = []) {
-    try {
-      let config;
-
-      // Support string path or configuration object
-      if (typeof serverConfig === "string") {
-        config = this.detectServerConfig(serverConfig);
-      } else {
-        config = serverConfig;
-      }
-
-      // Merge additional arguments
-      const finalArgs = [...config.args, ...additionalArgs];
-
-      return this.connect(config.command, finalArgs, {});
     } catch (error) {
       console.error("❌ MCP server connection failed:", error.message);
       this.isConnected = false;
