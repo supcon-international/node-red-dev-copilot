@@ -8,7 +8,7 @@ An AI programming assistant sidebar plugin for Node-RED with MCP (Model Context 
 
 ## Key Features
 
-- **Multi-Platform AI Support**: Works with OpenAI, Google Gemini, DeepSeek
+- **Multi-Platform AI Support**: Works with OpenAI, Google Gemini, DeepSeek, and Custom OpenAI-compatible APIs
 - **Real-time Streaming**: Server-Sent Events (SSE) based streaming responses for immediate feedback,default true
 - **MCP Protocol Integration**: Auto-discovers and calls MCP tools, combined with our Node-RED MCP server for powerful AI assistance in Node-RED development
 - **Intelligent Tool Calling**: AI automatically selects and executes relevant tools as needed
@@ -102,9 +102,10 @@ Main configuration options:
 
 **AI Service Settings**
 
-- Provider: Choose AI provider (openai/google/deepseek)
+- Provider: Choose AI provider (openai/google/deepseek/custom)
 - Model: Model name (e.g., gpt-4, gemini-2.5-pro, deepseek-chat)
 - API Key: Corresponding service API key
+- Custom URL: For custom OpenAI-compatible APIs (required when provider is "custom")
 - Temperature: Randomness control (0-2, recommended 0.1-0.3 for programming)
 - Max Tokens: Maximum response length (recommended 2000-4000)
 - Tool Call Limit: Tool call round limit (recommended 10-15)
@@ -144,6 +145,17 @@ Max Tokens: 2000
 Provider: deepseek
 Model: deepseek-chat
 API Key: sk-xxx...
+Temperature: 0.1
+Max Tokens: 2000
+```
+
+**Custom OpenAI-compatible API Configuration**
+
+```
+Provider: custom
+Model: your-model-name
+API Key: your-api-key
+Custom URL: https://your-api-endpoint.com/v1
 Temperature: 0.1
 Max Tokens: 2000
 ```

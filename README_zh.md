@@ -8,7 +8,7 @@
 
 ## 主要功能
 
-- **多平台 AI 支持**: 支持 OpenAI、Google Gemini、DeepSeek 主流 AI 服务
+- **多平台 AI 支持**: 支持 OpenAI、Google Gemini、DeepSeek 主流 AI 服务，以及自定义 OpenAI 兼容 API
 - **实时流式传输**: 基于服务器发送事件(SSE)的流式响应，提供即时反馈，默认开启
 - **MCP 协议集成**: 自动发现和调用 MCP 工具，结合我们的 Node-RED MCP 服务器，为 Node-RED 开发提供强大的 AI 辅助能力
 - **智能工具调用**: AI 可以根据需要自动选择和执行相关工具
@@ -101,9 +101,10 @@ contextStorage: {
 
 **AI 服务设置**
 
-- Provider: 选择 AI 提供商 (openai/google/deepseek)
+- Provider: 选择 AI 提供商 (openai/google/deepseek/custom)
 - Model: 模型名称 (如 gpt-4, gemini-2.5-pro, deepseek-chat)
 - API Key: 对应服务的 API 密钥
+- Custom URL: 自定义 OpenAI 兼容 API 的端点地址 (当 provider 为 "custom" 时必需)
 - Temperature: 随机性控制 (0-2, 编程建议用 0.1-0.3)
 - Max Tokens: 最大回复长度 (建议 2000-4000)
 - Tool Call Limit: 工具调用轮数限制 (建议 10-15)
@@ -143,6 +144,17 @@ Max Tokens: 2000
 Provider: deepseek
 Model: deepseek-chat
 API Key: sk-xxx...
+Temperature: 0.1
+Max Tokens: 2000
+```
+
+**自定义 OpenAI 兼容 API 配置**
+
+```
+Provider: custom
+Model: your-model-name
+API Key: your-api-key
+Custom URL: https://your-api-endpoint.com/v1
 Temperature: 0.1
 Max Tokens: 2000
 ```

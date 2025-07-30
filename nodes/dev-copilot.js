@@ -15,6 +15,7 @@ module.exports = function (RED) {
     // Get configuration properties
     node.provider = config.provider || "openai";
     node.model = config.model || "gpt-4.1";
+    node.customUrl = config.customUrl || "";
     node.temperature = parseFloat(config.temperature) || 0.1;
     node.maxTokens = parseInt(config.maxTokens) || 2000;
     node.toolCallLimit = parseInt(config.toolCallLimit) || 10;
@@ -47,6 +48,19 @@ module.exports = function (RED) {
             node.openaiClient = new OpenAI({
               apiKey: node.apiKey,
               baseURL: "https://api.deepseek.com",
+              timeout: 30000,
+            });
+            break;
+          case "custom":
+            if (!node.customUrl) {
+              node.warn(
+                `⚠️ Cannot initialize Custom LLM: API URL is required`
+              );
+              return;
+            }
+            node.openaiClient = new OpenAI({
+              apiKey: node.apiKey,
+              baseURL: node.customUrl,
               timeout: 30000,
             });
             break;
@@ -239,6 +253,7 @@ module.exports = function (RED) {
         switch (node.provider.toLowerCase()) {
           case "openai":
           case "deepseek":
+          case "custom":
             return await node.callOpenAIWithTools(messages, availableTools);
           case "google":
             return await node.callGoogleWithTools(messages, availableTools);
@@ -280,6 +295,7 @@ module.exports = function (RED) {
         switch (node.provider.toLowerCase()) {
           case "openai":
           case "deepseek":
+          case "custom":
             return await node.callOpenAIWithToolsStream(
               messages,
               availableTools,
@@ -295,7 +311,8 @@ module.exports = function (RED) {
           default:
             throw new Error(`Unsupported LLM provider: ${node.provider}`);
         }
-      } catch (error) {
+      }
+      catch (error) {
         node.error(
           `LLM API streaming call failed (${node.provider}): ${error.message}`
         );
@@ -318,6 +335,7 @@ module.exports = function (RED) {
         };
       }
     };
+
 
     // OpenAI API call (with tool integration) - using official SDK with automatic function calling
     node.callOpenAIWithTools = async function (messages, tools) {

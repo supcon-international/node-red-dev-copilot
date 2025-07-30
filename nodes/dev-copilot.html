@@ -7,6 +7,7 @@
       name: { value: "" },
       provider: { value: "openai", required: true },
       model: { value: "gpt-4.1", required: true },
+      customUrl: { value: "" },
       temperature: {
         value: 0.1,
         required: true,
@@ -47,24 +48,33 @@
         openai: "e.g.: gpt-4, gpt-4-turbo, gpt-3.5-turbo, gpt-4o, gpt-4o-mini",
         google: "e.g.: gemini-2.5-pro, gemini-2.5-flash",
         deepseek: "e.g.: deepseek-chat, deepseek-reasoner",
+        custom: "e.g.: llama3-8b-instruct, qwen2-7b-chat, your-model-name",
       };
 
-      function updateModelPlaceholder() {
+      function updateProviderUI() {
         const provider = $("#node-input-provider").val();
         const modelInput = $("#node-input-model");
 
+        // Update model placeholder
         if (providerPlaceholders[provider]) {
           modelInput.attr("placeholder", providerPlaceholders[provider]);
+        } else {
+          modelInput.attr("placeholder", "e.g., llama3-8b-instruct");
+        }
+
+        // Show/hide custom URL field
+        if (provider === "custom") {
+          $("#custom-url-row").show();
+        } else {
+          $("#custom-url-row").hide();
         }
       }
 
-      // Update model placeholder when provider changes
-      $("#node-input-provider").on("change", function () {
-        updateModelPlaceholder();
-      });
+      // Bind the event
+      $("#node-input-provider").on("change", updateProviderUI);
 
-      // Initialize
-      updateModelPlaceholder();
+      // Call on load
+      updateProviderUI();
     },
   });
 </script>
@@ -84,7 +94,20 @@
       <option value="openai">OpenAI</option>
       <option value="google">Google</option>
       <option value="deepseek">DeepSeek</option>
+      <option value="custom">Custom (OpenAI-compatible)</option>
     </select>
+  </div>
+
+  <!-- Custom URL Row -->
+  <div class="form-row" id="custom-url-row" style="display: none;">
+    <label for="node-input-customUrl"
+      ><i class="fa fa-globe"></i> API URL</label
+    >
+    <input
+      type="text"
+      id="node-input-customUrl"
+      placeholder="e.g., https://api.example.com/v1"
+    />
   </div>
 
   <div class="form-row">
@@ -220,10 +243,22 @@
   <h3>Configuration</h3>
   <dl class="message-properties">
     <dt>Provider <span class="property-type">string</span></dt>
-    <dd>The AI provider to use (OpenAI, Google, DeepSeek)</dd>
+    <dd>
+      The AI provider to use (OpenAI, Google, DeepSeek, Custom
+      OpenAI-compatible)
+    </dd>
 
     <dt>Model <span class="property-type">string</span></dt>
-    <dd>The specific model to use (e.g., gpt-4, gemini-1.5-pro)</dd>
+    <dd>
+      The specific model to use (e.g., gpt-4, gemini-1.5-pro,
+      llama3-8b-instruct)
+    </dd>
+
+    <dt>Custom URL <span class="property-type">string</span></dt>
+    <dd>
+      API endpoint URL for custom OpenAI-compatible providers (required when
+      provider is "custom")
+    </dd>
 
     <dt>Temperature <span class="property-type">number</span></dt>
     <dd>
