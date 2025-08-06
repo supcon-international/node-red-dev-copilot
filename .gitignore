@@ -98,3 +98,5 @@ package-lock.json
 
 #cursor
 .cursorrules
+.claude/
+CLAUDE.md
