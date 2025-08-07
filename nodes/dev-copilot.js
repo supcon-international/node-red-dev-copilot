@@ -4,7 +4,7 @@ const MCPClientHelper = require("../mcp/mcp-client.js");
 // Import official SDKs
 const OpenAI = require("openai");
 const { GoogleGenAI } = require("@google/genai");
-
+const DEFAULT_SYSTEM_PROMPT = `You are a node-red dev copilot integrated into Node-RED. Developed by SUPCON-INTERNATIONAL`;
 module.exports = function (RED) {
   "use strict";
 
@@ -53,9 +53,7 @@ module.exports = function (RED) {
             break;
           case "custom":
             if (!node.customUrl) {
-              node.warn(
-                `⚠️ Cannot initialize Custom LLM: API URL is required`
-              );
+              node.warn(`⚠️ Cannot initialize Custom LLM: API URL is required`);
               return;
             }
             node.openaiClient = new OpenAI({
@@ -84,7 +82,7 @@ module.exports = function (RED) {
     node.mcpClient = new MCPClientHelper();
 
     // System prompt (default)
-    node.defaultSystemPrompt = `You are a node-red dev copilot integrated into Node-RED. Developed by SUPCON-INTERNATIONAL`;
+    node.defaultSystemPrompt = DEFAULT_SYSTEM_PROMPT;
 
     // Initialize MCP connection - simplified configuration
     node.initMCP = async function () {
@@ -311,8 +309,7 @@ module.exports = function (RED) {
           default:
             throw new Error(`Unsupported LLM provider: ${node.provider}`);
         }
-      }
-      catch (error) {
+      } catch (error) {
         node.error(
           `LLM API streaming call failed (${node.provider}): ${error.message}`
         );
@@ -335,7 +332,6 @@ module.exports = function (RED) {
         };
       }
     };
-
 
     // OpenAI API call (with tool integration) - using official SDK with automatic function calling
     node.callOpenAIWithTools = async function (messages, tools) {
