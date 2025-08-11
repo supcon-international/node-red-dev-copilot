@@ -4,7 +4,10 @@ const MCPClientHelper = require("../mcp/mcp-client.js");
 // Import official SDKs
 const OpenAI = require("openai");
 const { GoogleGenAI } = require("@google/genai");
-const DEFAULT_SYSTEM_PROMPT = `You are a node-red dev copilot integrated into Node-RED. Developed by SUPCON-INTERNATIONAL`;
+
+// Import system prompt from dedicated module
+const { DEFAULT_SYSTEM_PROMPT } = require("../prompts/system-prompt.js");
+
 module.exports = function (RED) {
   "use strict";
 
@@ -13,6 +16,7 @@ module.exports = function (RED) {
     const node = this;
 
     // Get configuration properties
+    node.mode = config.mode || "service";
     node.provider = config.provider || "openai";
     node.model = config.model || "gpt-4.1";
     node.customUrl = config.customUrl || "";
@@ -80,6 +84,29 @@ module.exports = function (RED) {
 
     // MCP client instance - using new MCPClientHelper
     node.mcpClient = new MCPClientHelper();
+
+    // History management functions
+    node.getHistoryKey = function () {
+      if (node.mode === "service") {
+        return "dev-copilot-service-history";
+      } else {
+        return `dev-copilot-flow-history-${node.id}`;
+      }
+    };
+
+    node.getHistory = function () {
+      const key = node.getHistoryKey();
+      return node.context().global.get(key) || [];
+    };
+
+    node.saveHistory = function (history) {
+      const key = node.getHistoryKey();
+      node.context().global.set(key, history, function (err) {
+        if (err) {
+          node.warn("Failed to save history: " + err.message);
+        }
+      });
+    };
 
     // System prompt (default)
     node.defaultSystemPrompt = DEFAULT_SYSTEM_PROMPT;
@@ -1076,40 +1103,72 @@ module.exports = function (RED) {
 
     // Process input messages
     node.on("input", async function (msg) {
+      // Service Only for sidebar chat
+      if (node.mode === "service") {
+        node.warn(
+          "Service mode nodes are only for sidebar chat. Use Flow mode for message processing."
+        );
+        return;
+      }
+
       try {
         node.status({ fill: "blue", shape: "dot", text: "processing" });
 
-        // Build message history
+        // Build message history for Flow mode
         const messages = [
           {
             role: "system",
-            content: node.systemPrompt || node.defaultSystemPrompt,
+            content: node.systemPrompt || "You are a helpful assistant",
           },
         ];
 
-        // Add user message
-        if (msg.payload) {
-          messages.push({
-            role: "user",
-            content:
-              typeof msg.payload === "string"
-                ? msg.payload
-                : JSON.stringify(msg.payload),
-          });
+        // For Flow mode, load existing conversation history from storage
+        let conversationHistory = node.getHistory();
+
+        // If there are historical messages in the input, append them to existing history
+        if (msg.history && Array.isArray(msg.history)) {
+          conversationHistory.push(...msg.history);
         }
 
-        // If there are historical messages, add them to the conversation
-        if (msg.history && Array.isArray(msg.history)) {
-          messages.splice(1, 0, ...msg.history);
+        // Add current user message to conversation history first
+        const userMessage = {
+          role: "user",
+          content:
+            typeof msg.payload === "string"
+              ? msg.payload
+              : JSON.stringify(msg.payload),
+        };
+
+        if (msg.payload) {
+          // Add user message to conversation history
+          conversationHistory.push(userMessage);
+        }
+
+        // Add complete conversation history (including current user message) to messages
+        if (conversationHistory.length > 0) {
+          messages.splice(1, 0, ...conversationHistory);
         }
 
         // Call LLM
         const response = await node.callLLM(messages);
 
+        // Add assistant response to conversation history and save it
+        if (response && response.content) {
+          const assistantMessage = {
+            role: "assistant",
+            content: response.content,
+          };
+          conversationHistory.push(assistantMessage);
+
+          // Save updated conversation history to Flow node's independent storage
+          node.saveHistory(conversationHistory);
+        }
+
         // Prepare output message
         const outputMsg = {
           ...msg,
           payload: response.content,
+          history: conversationHistory, // Include updated history in output
           llm_config: {
             provider: node.provider,
             model: node.model,
@@ -1149,8 +1208,16 @@ module.exports = function (RED) {
     });
 
     // Clean up resources when node is closed
-    node.on("close", async function () {
+    node.on("close", async function (removed, done) {
       await node.disconnectMCP();
+
+      // Only clean up history when node is actually removed (not on flow restart)
+      if (removed && node.mode === "flow") {
+        const historyKey = `dev-copilot-flow-history-${node.id}`;
+        node.context().global.set(historyKey, null);
+      }
+
+      if (done) done();
     });
 
     // Initialize SDK clients
@@ -1257,7 +1324,10 @@ module.exports = function (RED) {
         });
       }
 
-      // Build messages
+      // Load current Service mode history
+      let serviceHistory = node.getHistory();
+
+      // Build messages for LLM call
       const messages = [
         {
           role: "system",
@@ -1265,17 +1335,33 @@ module.exports = function (RED) {
         },
       ];
 
-      if (history && Array.isArray(history)) {
-        messages.push(...history);
+      // Use the current service history
+      if (serviceHistory && serviceHistory.length > 0) {
+        messages.push(...serviceHistory);
       }
 
-      messages.push({
+      // Add current user message
+      const userMessage = {
         role: "user",
         content: message,
-      });
+      };
+      messages.push(userMessage);
 
       // Call LLM
       const response = await node.callLLM(messages);
+
+      // Add both user and assistant messages to service history
+      serviceHistory.push(userMessage);
+      if (response && response.content) {
+        const assistantMessage = {
+          role: "assistant",
+          content: response.content,
+        };
+        serviceHistory.push(assistantMessage);
+      }
+
+      // Save updated history to service storage
+      node.saveHistory(serviceHistory);
 
       res.json({
         success: true,
@@ -1359,7 +1445,10 @@ module.exports = function (RED) {
         return;
       }
 
-      // Build messages
+      // Load current Service mode history
+      let serviceHistory = node.getHistory();
+
+      // Build messages for LLM call
       const messages = [
         {
           role: "system",
@@ -1367,14 +1456,17 @@ module.exports = function (RED) {
         },
       ];
 
-      if (history && Array.isArray(history)) {
-        messages.push(...history);
+      // Use the current service history
+      if (serviceHistory && serviceHistory.length > 0) {
+        messages.push(...serviceHistory);
       }
 
-      messages.push({
+      // Add current user message
+      const userMessage = {
         role: "user",
         content: message,
-      });
+      };
+      messages.push(userMessage);
 
       // Send initial status
       sendSSE({
@@ -1382,10 +1474,27 @@ module.exports = function (RED) {
         content: "Starting response...",
       });
 
+      // Store the complete response for history
+      let completeResponse = "";
+
       // Call LLM with streaming
       await node.callLLMStream(messages, (chunk) => {
+        if (chunk.type === "content" && chunk.content) {
+          completeResponse += chunk.content;
+        }
         sendSSE(chunk);
       });
+
+      // Add user and assistant messages to service history and save
+      serviceHistory.push(userMessage);
+      if (completeResponse) {
+        const assistantMessage = {
+          role: "assistant",
+          content: completeResponse,
+        };
+        serviceHistory.push(assistantMessage);
+        node.saveHistory(serviceHistory);
+      }
 
       // Close connection
       res.end();
@@ -1412,6 +1521,12 @@ module.exports = function (RED) {
     // Get runtime node instances
     RED.nodes.eachNode(function (configNode) {
       if (configNode.type === "dev-copilot") {
+        // 只返回Service模式的节点
+        const mode = configNode.mode || "service"; // 默认service模式
+        if (mode !== "service") {
+          return; // 跳过非Service模式的节点
+        }
+
         // Find corresponding runtime node instance
         const runtimeNode = RED.nodes.getNode(configNode.id);
         if (runtimeNode) {
@@ -1420,6 +1535,7 @@ module.exports = function (RED) {
             name: runtimeNode.name || configNode.name || "Dev Copilot",
             provider: runtimeNode.provider || configNode.provider,
             model: runtimeNode.model || configNode.model,
+            mode: runtimeNode.mode || configNode.mode || "service",
             status: "deployed", // Has runtime instance means deployed
           });
         } else {
@@ -1429,6 +1545,7 @@ module.exports = function (RED) {
             name: configNode.name || "Dev Copilot",
             provider: configNode.provider,
             model: configNode.model,
+            mode: configNode.mode || "service",
             status: "not_deployed", // Not deployed
           });
         }
@@ -1437,6 +1554,8 @@ module.exports = function (RED) {
 
     res.json(nodes);
   });
+
+  // 注意：节点选择记录现在直接使用context storage API，不需要专门的端点
 
   // API endpoint: get context data
   RED.httpAdmin.post("/dev-copilot/context/get", function (req, res) {

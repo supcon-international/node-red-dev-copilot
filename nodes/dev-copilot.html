@@ -5,6 +5,7 @@
     color: "#87CEEB",
     defaults: {
       name: { value: "" },
+      mode: { value: "service", required: true },
       provider: { value: "openai", required: true },
       model: { value: "gpt-4.1", required: true },
       customUrl: { value: "" },
@@ -37,7 +38,8 @@
     outputs: 1,
     icon: "font-awesome/fa-robot",
     label: function () {
-      return this.name || `${this.provider} ${this.model}`;
+      const modeLabel = this.mode === "flow" ? "[Flow]" : "[Service]";
+      return this.name || `${modeLabel} ${this.provider} ${this.model}`;
     },
     labelStyle: function () {
       return this.name ? "node_label_italic" : "";
@@ -71,11 +73,19 @@
         }
       }
 
-      // Bind the event
+      function updateModeUI() {
+        const mode = $("#node-input-mode").val();
+        $("#service-tip, #flow-tip").hide();
+        $(`#${mode}-tip`).show();
+      }
+
+      // Bind the events
       $("#node-input-provider").on("change", updateProviderUI);
+      $("#node-input-mode").on("change", updateModeUI);
 
       // Call on load
       updateProviderUI();
+      updateModeUI();
     },
   });
 </script>
@@ -85,6 +95,22 @@
   <div class="form-row">
     <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
     <input type="text" id="node-input-name" placeholder="Name" />
+  </div>
+
+  <div class="form-row">
+    <label for="node-input-mode"><i class="fa fa-cogs"></i> Mode</label>
+    <select id="node-input-mode">
+      <option value="service">Service (Sidebar Chat)</option>
+      <option value="flow">Flow (Process Messages)</option>
+    </select>
+    <div class="form-tips" id="mode-description">
+      <div id="service-tip" style="display: none;">
+        <strong>Service Mode:</strong> Used for sidebar chat interface. Shares conversation history with other Service nodes.
+      </div>
+      <div id="flow-tip" style="display: none;">
+        <strong>Flow Mode:</strong> Used in flows to process messages. Maintains independent conversation history for this node.
+      </div>
+    </div>
   </div>
 
   <div class="form-row">
@@ -437,9 +463,9 @@
       let messageHistory = [];
       let currentNodeId = null;
 
-      // Message persistence functionality - Using Node-RED context storage (localfilesystem) instead of localStorage
-      const GLOBAL_MESSAGES_CONTEXT_KEY = "dev-copilot-global-messages"; // Global shared message history Key in global.json
-      const SELECTED_NODE_CONTEXT_KEY = "dev-copilot-selected-node";
+      // Message persistence functionality - Using Node-RED context storage (localfilesystem) 
+      const SERVICE_HISTORY_KEY = "dev-copilot-service-history"; // Service Global Shared Key
+      const SELECTED_NODE_KEY = "dev-copilot-selected-service-node"; // Last selected Service node Key
 
       // Context storage helper functions
       async function getContextData(key, nodeId = null) {
@@ -487,10 +513,10 @@
         }
       }
 
-      // Load global shared message history from Node-RED context storage
+      // Load service mode shared message history from Node-RED context storage
       async function loadMessageHistory() {
         try {
-          const stored = await getContextData(GLOBAL_MESSAGES_CONTEXT_KEY);
+          const stored = await getContextData(SERVICE_HISTORY_KEY);
 
           if (stored && Array.isArray(stored)) {
             return stored;
@@ -501,7 +527,7 @@
         return [];
       }
 
-      // Save global shared message history to Node-RED context storage
+      // Save service mode shared message history to Node-RED context storage
       async function saveMessageHistory(history) {
         if (!Array.isArray(history)) return false;
 
@@ -509,7 +535,7 @@
           // Limit history length to avoid context storage becoming too large
 
           const success = await setContextData(
-            GLOBAL_MESSAGES_CONTEXT_KEY,
+            SERVICE_HISTORY_KEY,
             history
           );
           return success;
@@ -548,13 +574,10 @@
         await saveMessageHistory(messageHistory);
       }
 
-      // Save selected node ID to Node-RED context storage
+      // Save selected Service node ID to global.json
       async function saveSelectedNode(nodeId) {
         try {
-          const success = await setContextData(
-            SELECTED_NODE_CONTEXT_KEY,
-            nodeId
-          );
+          const success = await setContextData(SELECTED_NODE_KEY, nodeId);
           return success;
         } catch (error) {
           console.warn("Failed to save selected node:", error);
@@ -562,10 +585,10 @@
         }
       }
 
-      // Load last selected node ID from Node-RED context storage
+      // Load last selected Service node ID from global.json
       async function loadSelectedNode() {
         try {
-          const nodeId = await getContextData(SELECTED_NODE_CONTEXT_KEY);
+          const nodeId = await getContextData(SELECTED_NODE_KEY);
           return nodeId;
         } catch (error) {
           console.warn("Failed to load selected node:", error);
@@ -587,7 +610,7 @@
           );
 
           // Remove from Node-RED context storage
-          const success = await deleteContextData(GLOBAL_MESSAGES_CONTEXT_KEY);
+          const success = await deleteContextData(SERVICE_HISTORY_KEY);
           RED.notify(
             "Global chat history cleared",
             success ? "success" : "error"
@@ -636,9 +659,8 @@
           ":checked"
         );
 
-        // Add user message to interface and save
+        // Add user message to interface only (server will save the complete conversation)
         addMessageToUI("user", message);
-        addMessageAndSave("user", message); // Use new save function (async)
 
         // Clear input box
         messageInput.val("");
@@ -685,7 +707,7 @@
 
             return xhr;
           },
-          success: function (response) {
+          success: async function (response) {
             // Check if request was aborted
             if (currentAbortController?.signal.aborted) {
               return;
@@ -700,7 +722,9 @@
 
             if (response.success) {
               addMessageToUI("assistant", response.response);
-              addMessageAndSave("assistant", response.response); // Save AI response (async)
+              
+              // Reload history from server to keep in sync (server has already saved the complete conversation)
+              messageHistory = await loadMessageHistory();
             } else {
               addMessageToUI("error", "Error: " + response.error);
             }
@@ -804,13 +828,12 @@
             }
           }
 
-          // Final save and cleanup
+          // Final cleanup and sync
           if (!currentAbortController.signal.aborted) {
-            if (accumulatedContent) {
-              addMessageAndSave("assistant", accumulatedContent);
-            }
-
             finishStreamingMessage(currentMessageElement);
+            
+            // Reload history from server to keep in sync (server has already saved the complete conversation)
+            messageHistory = await loadMessageHistory();
             setSendButtonState("ready");
           }
         } catch (error) {
@@ -823,8 +846,7 @@
               updateMessageContent(currentMessageElement, stoppedContent);
               finishStreamingMessage(currentMessageElement);
 
-              // Save the partial content
-              addMessageAndSave("assistant", accumulatedContent);
+              // Note: Partial content from streaming abort is not saved to maintain consistency
             } else if (currentMessageElement) {
               // No content generated, remove the empty message
               currentMessageElement.remove();
@@ -1061,7 +1083,7 @@ ${undeployedNodes
               const displayName = node.name || "Unnamed node";
               const option = $("<option></option>")
                 .val(node.id)
-                .text(`${displayName} (${node.provider} ${node.model})`);
+                .text(`[Service] ${displayName} (${node.provider} ${node.model})`);
               nodeSelect.append(option);
             });
 
