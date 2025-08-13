@@ -8,6 +8,11 @@ const { GoogleGenAI } = require("@google/genai");
 // Import system prompt from dedicated module
 const { DEFAULT_SYSTEM_PROMPT } = require("../prompts/system-prompt.js");
 
+// Get API prefix from environment variable
+const API_PREFIX = process.env.NODE_HTTP_API_PREFIX 
+  ? process.env.NODE_HTTP_API_PREFIX + "/dev-copilot" 
+  : "/dev-copilot";
+
 module.exports = function (RED) {
   "use strict";
 
@@ -1245,14 +1250,33 @@ module.exports = function (RED) {
     },
   });
 
+  // Inject API prefix configuration into client-side via custom endpoint
+  RED.httpAdmin.get("/dev-copilot-config.js", function (req, res) {
+    const configScript = `
+      // API prefix configuration injected by backend
+      window.NODE_HTTP_API_PREFIX = '${API_PREFIX}';
+      console.log('Dev Copilot: API prefix configured via script injection:', window.NODE_HTTP_API_PREFIX);
+    `;
+
+    res.setHeader("Content-Type", "application/javascript");
+    res.send(configScript);
+  });
+
   // Register sidebar
-  RED.httpAdmin.get("/dev-copilot/sidebar", function (req, res) {
+  RED.httpAdmin.get(`${API_PREFIX}/sidebar`, function (req, res) {
+    const fs = require("fs");
     const sidebarPath = path.join(__dirname, "../public/sidebar.html");
 
     // Check if file exists
-    const fs = require("fs");
     if (fs.existsSync(sidebarPath)) {
-      res.sendFile(sidebarPath);
+      // Read HTML template
+      let htmlContent = fs.readFileSync(sidebarPath, "utf8");
+
+      // Inject API prefix variable
+      htmlContent = htmlContent.replace("{{API_PREFIX}}", API_PREFIX);
+
+      res.setHeader("Content-Type", "text/html");
+      res.send(htmlContent);
     } else {
       RED.log.error("Dev Copilot sidebar file not found: " + sidebarPath);
       res.status(404).send("Sidebar file not found");
@@ -1260,7 +1284,7 @@ module.exports = function (RED) {
   });
 
   // API endpoint: send message to copilot
-  RED.httpAdmin.post("/dev-copilot/chat", async function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/chat`, async function (req, res) {
     try {
       const { message, nodeId, history } = req.body;
 
@@ -1380,7 +1404,7 @@ module.exports = function (RED) {
   });
 
   // API endpoint: send message to copilot with streaming
-  RED.httpAdmin.post("/dev-copilot/chat-stream", async function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/chat-stream`, async function (req, res) {
     try {
       const { message, nodeId, history } = req.body;
 
@@ -1515,7 +1539,7 @@ module.exports = function (RED) {
   });
 
   // API endpoint: get available dev-copilot nodes
-  RED.httpAdmin.get("/dev-copilot/nodes", function (req, res) {
+  RED.httpAdmin.get(`${API_PREFIX}/nodes`, function (req, res) {
     const nodes = [];
 
     // Get runtime node instances
@@ -1558,7 +1582,7 @@ module.exports = function (RED) {
   // 注意：节点选择记录现在直接使用context storage API，不需要专门的端点
 
   // API endpoint: get context data
-  RED.httpAdmin.post("/dev-copilot/context/get", function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/context/get`, function (req, res) {
     try {
       const { key, nodeId } = req.body;
 
@@ -1604,7 +1628,7 @@ module.exports = function (RED) {
   });
 
   // API endpoint: set context data
-  RED.httpAdmin.post("/dev-copilot/context/set", function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/context/set`, function (req, res) {
     try {
       const { key, data, nodeId } = req.body;
 
@@ -1649,8 +1673,24 @@ module.exports = function (RED) {
     }
   });
 
+  // Fixed configuration endpoint (always at /dev-copilot-config)
+  RED.httpAdmin.get("/dev-copilot-config", function (req, res) {
+    res.json({
+      apiPrefix: API_PREFIX,
+      version: require("../package.json").version,
+    });
+  });
+
+  // API endpoint: get configuration (including API prefix) - dynamic path
+  RED.httpAdmin.get(`${API_PREFIX}/config`, function (req, res) {
+    res.json({
+      apiPrefix: API_PREFIX,
+      version: require("../package.json").version,
+    });
+  });
+
   // API endpoint: delete context data
-  RED.httpAdmin.post("/dev-copilot/context/delete", function (req, res) {
+  RED.httpAdmin.post(`${API_PREFIX}/context/delete`, function (req, res) {
     try {
       const { key, nodeId } = req.body;
 

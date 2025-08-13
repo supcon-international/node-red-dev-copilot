@@ -396,6 +396,9 @@
 
 
     <script>
+      // Inject API prefix configuration
+      window.NODE_HTTP_API_PREFIX = '{{API_PREFIX}}';
+      
       // Auto-adjust input box height
       document.addEventListener("DOMContentLoaded", function () {
         const textarea = document.getElementById("dev-copilot-input");

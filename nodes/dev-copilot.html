@@ -1,4 +1,5 @@
 <!-- Dev Copilot Node Configuration Panel -->
+<script src="/dev-copilot-config.js"></script>
 <script type="text/javascript">
   RED.nodes.registerType("dev-copilot", {
     category: "AI dev copilot",
@@ -105,10 +106,12 @@
     </select>
     <div class="form-tips" id="mode-description">
       <div id="service-tip" style="display: none;">
-        <strong>Service Mode:</strong> Used for sidebar chat interface. Shares conversation history with other Service nodes.
+        <strong>Service Mode:</strong> Used for sidebar chat interface. Shares
+        conversation history with other Service nodes.
       </div>
       <div id="flow-tip" style="display: none;">
-        <strong>Flow Mode:</strong> Used in flows to process messages. Maintains independent conversation history for this node.
+        <strong>Flow Mode:</strong> Used in flows to process messages. Maintains
+        independent conversation history for this node.
       </div>
     </div>
   </div>
@@ -416,15 +419,36 @@
       });
     }
 
-    function loadSidebarContent() {
-      const content = $("#dev-copilot-content");
-      if (content.length === 0) {
-        setTimeout(loadSidebarContent, 500);
-        return;
+    // Get API prefix from dynamic script injection
+    function getApiPrefix() {
+      // Check if dynamic script injection worked
+      if (window.NODE_HTTP_API_PREFIX) {
+        console.log(
+          "Dev Copilot: Using API prefix from dynamic script:",
+          window.NODE_HTTP_API_PREFIX
+        );
+        return window.NODE_HTTP_API_PREFIX;
       }
 
-      // Load sidebar content
-      $.get("/dev-copilot/sidebar")
+      // Fallback to default if script didn't load
+      console.warn("Dev Copilot: Dynamic script failed, using default prefix");
+      return "/dev-copilot";
+    }
+
+    function loadConfigAndSidebar() {
+      const content = $("#dev-copilot-content");
+
+      // Get API prefix from template injection (no HTTP request needed)
+      const apiPrefix = getApiPrefix();
+
+      // Load sidebar with detected prefix
+      loadSidebarWithPrefix(apiPrefix);
+    }
+
+    function loadSidebarWithPrefix(apiPrefix) {
+      const content = $("#dev-copilot-content");
+
+      $.get(`${apiPrefix}/sidebar`)
         .done(function (data) {
           content.html(data);
           initializeSidebarFunctionality();
@@ -452,6 +476,17 @@
         });
     }
 
+    function loadSidebarContent() {
+      const content = $("#dev-copilot-content");
+      if (content.length === 0) {
+        setTimeout(loadSidebarContent, 500);
+        return;
+      }
+
+      // First try to get configuration, then load sidebar
+      loadConfigAndSidebar();
+    }
+
     function initializeSidebarFunctionality() {
       // Initialize sidebar functionality
       const messageContainer = $("#dev-copilot-messages");
@@ -463,15 +498,16 @@
       let messageHistory = [];
       let currentNodeId = null;
 
-      // Message persistence functionality - Using Node-RED context storage (localfilesystem) 
+      // Message persistence functionality - Using Node-RED context storage (localfilesystem)
       const SERVICE_HISTORY_KEY = "dev-copilot-service-history"; // Service Global Shared Key
       const SELECTED_NODE_KEY = "dev-copilot-selected-service-node"; // Last selected Service node Key
 
       // Context storage helper functions
       async function getContextData(key, nodeId = null) {
         try {
+          const apiPrefix = getApiPrefix();
           const response = await $.ajax({
-            url: "/dev-copilot/context/get",
+            url: `${apiPrefix}/context/get`,
             method: "POST",
             contentType: "application/json",
             data: JSON.stringify({ key, nodeId }),
@@ -485,8 +521,9 @@
 
       async function setContextData(key, data, nodeId = null) {
         try {
+          const apiPrefix = getApiPrefix();
           const response = await $.ajax({
-            url: "/dev-copilot/context/set",
+            url: `${apiPrefix}/context/set`,
             method: "POST",
             contentType: "application/json",
             data: JSON.stringify({ key, data, nodeId }),
@@ -500,8 +537,9 @@
 
       async function deleteContextData(key, nodeId = null) {
         try {
+          const apiPrefix = getApiPrefix();
           const response = await $.ajax({
-            url: "/dev-copilot/context/delete",
+            url: `${apiPrefix}/context/delete`,
             method: "POST",
             contentType: "application/json",
             data: JSON.stringify({ key, nodeId }),
@@ -534,10 +572,7 @@
         try {
           // Limit history length to avoid context storage becoming too large
 
-          const success = await setContextData(
-            SERVICE_HISTORY_KEY,
-            history
-          );
+          const success = await setContextData(SERVICE_HISTORY_KEY, history);
           return success;
         } catch (error) {
           console.warn("Failed to save message history:", error);
@@ -688,8 +723,9 @@
         currentAbortController = new AbortController();
 
         // Send request
+        const apiPrefix = getApiPrefix();
         $.ajax({
-          url: "/dev-copilot/chat",
+          url: `${apiPrefix}/chat`,
           method: "POST",
           contentType: "application/json",
           data: JSON.stringify({
@@ -722,7 +758,7 @@
 
             if (response.success) {
               addMessageToUI("assistant", response.response);
-              
+
               // Reload history from server to keep in sync (server has already saved the complete conversation)
               messageHistory = await loadMessageHistory();
             } else {
@@ -775,7 +811,8 @@
 
         try {
           // Use fetch API for streaming SSE
-          const response = await fetch("/dev-copilot/chat-stream", {
+          const apiPrefix = getApiPrefix();
+          const response = await fetch(`${apiPrefix}/chat-stream`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -831,7 +868,7 @@
           // Final cleanup and sync
           if (!currentAbortController.signal.aborted) {
             finishStreamingMessage(currentMessageElement);
-            
+
             // Reload history from server to keep in sync (server has already saved the complete conversation)
             messageHistory = await loadMessageHistory();
             setSendButtonState("ready");
@@ -996,7 +1033,8 @@
 
       // Load available nodes
       function loadAvailableNodes() {
-        $.get("/dev-copilot/nodes", function (nodes) {
+        const apiPrefix = getApiPrefix();
+        $.get(`${apiPrefix}/nodes`, function (nodes) {
           nodeSelect.empty();
 
           // Separate deployed and undeployed nodes
@@ -1083,7 +1121,9 @@ ${undeployedNodes
               const displayName = node.name || "Unnamed node";
               const option = $("<option></option>")
                 .val(node.id)
-                .text(`[Service] ${displayName} (${node.provider} ${node.model})`);
+                .text(
+                  `[Service] ${displayName} (${node.provider} ${node.model})`
+                );
               nodeSelect.append(option);
             });
 

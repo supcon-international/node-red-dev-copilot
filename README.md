@@ -97,8 +97,13 @@ It works without this configuration, but chat history will only be valid during 
 
 1. Drag the "dev copilot" node from the "AI dev copilot" category to the canvas
 2. Double-click the node to configure
+3. Choose between **Service Mode** (for sidebar chat) or **Flow Mode** (for flow processing)
 
 Main configuration options:
+
+**Node Mode Settings**
+
+- Mode: Choose **Service Mode** (for sidebar chat with shared history) or **Flow Mode** (for flow processing with independent history)
 
 **AI Service Settings**
 
@@ -217,6 +222,19 @@ The plugin provides the following HTTP interfaces:
 - `POST /dev-copilot/chat` - Send chat message (non-streaming)
 - `POST /dev-copilot/chat-stream` - Send chat message with Server-Sent Events streaming
 - `GET /dev-copilot/nodes` - Get available nodes list
+
+### Custom API Prefix
+
+You can customize the API prefix by setting the `NODE_HTTP_API_PREFIX` environment variable:
+
+```bash
+# Default: /dev-copilot
+export NODE_HTTP_API_PREFIX="/custom-prefix"
+# Results in: /custom-prefix/dev-copilot
+
+# Clear the environment variable
+unset NODE_HTTP_API_PREFIX
+```
 
 ## Development
 

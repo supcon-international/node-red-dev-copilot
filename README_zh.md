@@ -96,8 +96,13 @@ contextStorage: {
 
 1. 从节点面板的 "AI dev copilot" 分类拖拽 "dev copilot" 节点到画布
 2. 双击节点进行配置
+3. 选择 **Service 模式**（用于侧边栏聊天）或 **Flow 模式**（用于流程处理）
 
 主要配置项：
+
+**节点模式设置**
+
+- Mode: 选择 **Service 模式**（用于侧边栏聊天，共享历史记录）或 **Flow 模式**（用于流程处理，独立历史记录）
 
 **AI 服务设置**
 
@@ -216,6 +221,19 @@ npx @supcon-international/node-red-mcp-server
 - `POST /dev-copilot/chat` - 发送聊天消息 (非流式)
 - `POST /dev-copilot/chat-stream` - 发送聊天消息并支持服务器发送事件流式传输
 - `GET /dev-copilot/nodes` - 获取可用节点列表
+
+### 自定义 API 前缀
+
+您可以通过设置 `NODE_HTTP_API_PREFIX` 环境变量来自定义 API 前缀：
+
+```bash
+# 默认: /dev-copilot
+export NODE_HTTP_API_PREFIX="/custom-prefix"
+# 结果: /custom-prefix/dev-copilot
+
+# 清除环境变量
+unset NODE_HTTP_API_PREFIX
+```
 
 ## 开发相关
 
