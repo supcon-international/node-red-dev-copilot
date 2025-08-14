@@ -1,6 +1,6 @@
 {
   "name": "@supcon-international/node-red-dev-copilot",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "A Node-RED sidebar plugin that provides AI development copilot functionality with MCP support",
   "main": "nodes/dev-copilot.js",
   "scripts": {

@@ -9,8 +9,8 @@ const { GoogleGenAI } = require("@google/genai");
 const { DEFAULT_SYSTEM_PROMPT } = require("../prompts/system-prompt.js");
 
 // Get API prefix from environment variable
-const API_PREFIX = process.env.NODE_HTTP_API_PREFIX 
-  ? process.env.NODE_HTTP_API_PREFIX + "/dev-copilot" 
+const API_PREFIX = process.env.NODE_HTTP_API_PREFIX
+  ? process.env.NODE_HTTP_API_PREFIX + "/dev-copilot"
   : "/dev-copilot";
 
 module.exports = function (RED) {
@@ -1252,9 +1252,10 @@ module.exports = function (RED) {
 
   // Inject API prefix configuration into client-side via custom endpoint
   RED.httpAdmin.get("/dev-copilot-config.js", function (req, res) {
+    const effectivePrefix = `${req.baseUrl || ""}${API_PREFIX}`;
     const configScript = `
       // API prefix configuration injected by backend
-      window.NODE_HTTP_API_PREFIX = '${API_PREFIX}';
+      window.NODE_HTTP_API_PREFIX = '${effectivePrefix}';
       console.log('Dev Copilot: API prefix configured via script injection:', window.NODE_HTTP_API_PREFIX);
     `;
 
@@ -1272,8 +1273,9 @@ module.exports = function (RED) {
       // Read HTML template
       let htmlContent = fs.readFileSync(sidebarPath, "utf8");
 
-      // Inject API prefix variable
-      htmlContent = htmlContent.replace("{{API_PREFIX}}", API_PREFIX);
+      // Inject API prefix variable including admin base
+      const effectivePrefix = `${req.baseUrl || ""}${API_PREFIX}`;
+      htmlContent = htmlContent.replace("{{API_PREFIX}}", effectivePrefix);
 
       res.setHeader("Content-Type", "text/html");
       res.send(htmlContent);
@@ -1675,16 +1677,18 @@ module.exports = function (RED) {
 
   // Fixed configuration endpoint (always at /dev-copilot-config)
   RED.httpAdmin.get("/dev-copilot-config", function (req, res) {
+    const effectivePrefix = `${req.baseUrl || ""}${API_PREFIX}`;
     res.json({
-      apiPrefix: API_PREFIX,
+      apiPrefix: effectivePrefix,
       version: require("../package.json").version,
     });
   });
 
   // API endpoint: get configuration (including API prefix) - dynamic path
   RED.httpAdmin.get(`${API_PREFIX}/config`, function (req, res) {
+    const effectivePrefix = `${req.baseUrl || ""}${API_PREFIX}`;
     res.json({
-      apiPrefix: API_PREFIX,
+      apiPrefix: effectivePrefix,
       version: require("../package.json").version,
     });
   });
