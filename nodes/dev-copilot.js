@@ -411,10 +411,16 @@ module.exports = function (RED) {
             const toolArgs = JSON.parse(toolCall.function.arguments);
 
             finalContent.push(`🔧 Calling tool: ${toolName}`);
+            
+            // Console output: Tool call
+            console.log(`🔧 [Dev-Copilot] Tool Call: ${toolName}`, toolArgs);
 
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
               const formattedResult = node.formatToolResult(toolResult);
+              
+              // Console output: Tool result (complete)
+              console.log(`✅ [Dev-Copilot] Tool Result: ${toolName}`, formattedResult);
 
               conversationMessages.push({
                 role: "tool",
@@ -422,6 +428,9 @@ module.exports = function (RED) {
                 content: formattedResult,
               });
             } catch (error) {
+              // Console output: Tool error
+              console.log(`❌ [Dev-Copilot] Tool Error: ${toolName}`, error.message);
+              
               conversationMessages.push({
                 role: "tool",
                 tool_call_id: toolCall.id,
@@ -597,6 +606,9 @@ module.exports = function (RED) {
                 functionCall.args || functionCall.arguments || {};
 
               finalContent.push(`🔧 Calling tool: ${toolName}`);
+              
+              // Console output: Tool call (Google)
+              console.log(`🔧 [Dev-Copilot] Tool Call: ${toolName}`, toolArgs);
 
               try {
                 const toolResult = await node.executeMCPTool(
@@ -604,6 +616,9 @@ module.exports = function (RED) {
                   toolArgs
                 );
                 const formattedResult = node.formatToolResult(toolResult);
+                
+                // Console output: Tool result (Google, complete)
+                console.log(`✅ [Dev-Copilot] Tool Result: ${toolName}`, formattedResult);
 
                 functionResponses.push({
                   functionResponse: {
@@ -614,6 +629,9 @@ module.exports = function (RED) {
                   },
                 });
               } catch (error) {
+                // Console output: Tool error (Google)
+                console.log(`❌ [Dev-Copilot] Tool Error: ${toolName}`, error.message);
+                
                 functionResponses.push({
                   functionResponse: {
                     name: toolName,
@@ -781,6 +799,9 @@ module.exports = function (RED) {
 
             const toolMessage = `🔧 Calling tool: ${toolName}`;
             finalContent.push(toolMessage);
+            
+            // Console output: Tool call (Stream)
+            console.log(`🔧 [Dev-Copilot] Tool Call (Stream): ${toolName}`, toolArgs);
 
             if (streamCallback) {
               streamCallback({
@@ -792,6 +813,9 @@ module.exports = function (RED) {
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
               const formattedResult = node.formatToolResult(toolResult);
+              
+              // Console output: Tool result (Stream)
+              console.log(`✅ [Dev-Copilot] Tool Result (Stream): ${toolName}`, formattedResult);
 
               conversationMessages.push({
                 role: "tool",
@@ -799,6 +823,9 @@ module.exports = function (RED) {
                 content: formattedResult,
               });
             } catch (error) {
+              // Console output: Tool error (Stream)
+              console.log(`❌ [Dev-Copilot] Tool Error (Stream): ${toolName}`, error.message);
+              
               const errorMessage = `❌ Tool call failed: ${error.message}`;
               finalContent.push(errorMessage);
 
@@ -1020,6 +1047,9 @@ module.exports = function (RED) {
                 functionCall.args || functionCall.arguments || {};
 
               const toolMessage = `🔧 Calling tool: ${toolName}`;
+              
+              // Console output: Tool call (Google Stream)
+              console.log(`🔧 [Dev-Copilot] Tool Call (Google Stream): ${toolName}`, toolArgs);
 
               if (streamCallback) {
                 streamCallback({
@@ -1034,6 +1064,9 @@ module.exports = function (RED) {
                   toolArgs
                 );
                 const formattedResult = node.formatToolResult(toolResult);
+                
+                // Console output: Tool result (Google Stream)
+                console.log(`✅ [Dev-Copilot] Tool Result (Google Stream): ${toolName}`, formattedResult);
 
                 functionResponses.push({
                   functionResponse: {
@@ -1044,6 +1077,9 @@ module.exports = function (RED) {
                   },
                 });
               } catch (error) {
+                // Console output: Tool error (Google Stream)
+                console.log(`❌ [Dev-Copilot] Tool Error (Google Stream): ${toolName}`, error.message);
+                
                 const errorMessage = `❌ Tool call failed: ${error.message}`;
 
                 if (streamCallback) {
@@ -1145,6 +1181,9 @@ module.exports = function (RED) {
         };
 
         if (msg.payload) {
+          // Console output: Flow mode input
+          console.log("🟦 [Dev-Copilot] Flow Input:", userMessage.content);
+          
           // Add user message to conversation history
           conversationHistory.push(userMessage);
         }
@@ -1155,7 +1194,11 @@ module.exports = function (RED) {
         }
 
         // Call LLM
+        console.log("🔄 [Dev-Copilot] Calling LLM (Flow)...");
         const response = await node.callLLM(messages);
+        
+        // Console output: Flow response
+        console.log("🟩 [Dev-Copilot] Flow Response:", response.content || "No content");
 
         // Add assistant response to conversation history and save it
         if (response && response.content) {
@@ -1373,8 +1416,15 @@ module.exports = function (RED) {
       };
       messages.push(userMessage);
 
+      // Console output: User input
+      console.log("🟦 [Dev-Copilot] User Input:", message);
+
       // Call LLM
+      console.log("🔄 [Dev-Copilot] Calling LLM...");
       const response = await node.callLLM(messages);
+      
+      // Console output: LLM response
+      console.log("🟩 [Dev-Copilot] LLM Response:", response.content || "No content");
 
       // Add both user and assistant messages to service history
       serviceHistory.push(userMessage);
@@ -1494,6 +1544,9 @@ module.exports = function (RED) {
       };
       messages.push(userMessage);
 
+      // Console output: User input (Stream)
+      console.log("🟦 [Dev-Copilot] User Input (Stream):", message);
+
       // Send initial status
       sendSSE({
         type: "start",
@@ -1503,6 +1556,9 @@ module.exports = function (RED) {
       // Store the complete response for history
       let completeResponse = "";
 
+      // Console output: Starting stream
+      console.log("🔄 [Dev-Copilot] Calling LLM (Stream)...");
+
       // Call LLM with streaming
       await node.callLLMStream(messages, (chunk) => {
         if (chunk.type === "content" && chunk.content) {
@@ -1510,6 +1566,9 @@ module.exports = function (RED) {
         }
         sendSSE(chunk);
       });
+
+      // Console output: Stream response completed
+      console.log("🟩 [Dev-Copilot] Stream Response Completed:", completeResponse);
 
       // Add user and assistant messages to service history and save
       serviceHistory.push(userMessage);
