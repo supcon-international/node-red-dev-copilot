@@ -1486,11 +1486,12 @@ module.exports = function (RED) {
               : undefined,
           };
 
-          const streamingResponse = await node.googleClient.models.generateContentStream({
-            model: node.model,
-            contents: contents,
-            config: config,
-          });
+          const streamingResponse =
+            await node.googleClient.models.generateContentStream({
+              model: node.model,
+              contents: contents,
+              config: config,
+            });
 
           lastResponse = null;
           let currentStreamText = "";
@@ -1589,12 +1590,16 @@ module.exports = function (RED) {
 
             for (const functionCall of streamFunctionCalls) {
               const toolName = functionCall.name;
-              const toolArgs = functionCall.args || functionCall.arguments || {};
+              const toolArgs =
+                functionCall.args || functionCall.arguments || {};
 
               const toolMessage = `🔧 Calling tool: ${toolName}`;
 
               // Console output: Tool call (Google Stream)
-              console.log(`🔧 [Dev-Copilot] Tool Call (Google Stream): ${toolName}`, toolArgs);
+              console.log(
+                `🔧 [Dev-Copilot] Tool Call (Google Stream): ${toolName}`,
+                toolArgs
+              );
 
               if (streamCallback) {
                 streamCallback({
@@ -1604,7 +1609,10 @@ module.exports = function (RED) {
               }
 
               try {
-                const toolResult = await node.executeMCPTool(toolName, toolArgs);
+                const toolResult = await node.executeMCPTool(
+                  toolName,
+                  toolArgs
+                );
                 const formattedResult = node.formatToolResult(toolResult);
 
                 // Console output: Tool result (Google Stream)
@@ -1678,7 +1686,9 @@ module.exports = function (RED) {
             continue;
           }
         } catch (error) {
-          throw new Error(`Google API streaming with tools failed: ${error.message}`);
+          throw new Error(
+            `Google API streaming with tools failed: ${error.message}`
+          );
         }
       }
 
