@@ -67,30 +67,40 @@ module.exports = function (RED) {
 
     // Shared function to convert messages to Google format with tool history embedding
     node.convertToGoogleFormat = function (messages, providerName = "Google") {
-      return messages.map((msg) => {
-        let content = msg.content;
-
-        if (msg._toolHistory && msg._toolHistory.length > 0) {
-          const toolsToEmbed = msg._toolHistory;
-          const toolHistoryText = toolsToEmbed
-            .map(
-              (tool) =>
-                `[TOOL_HISTORY] ${tool.name}(${JSON.stringify(tool.args)}) -> ${
-                  typeof tool.result === "string"
-                    ? tool.result
-                    : JSON.stringify(tool.result)
-                }`
-            )
-            .join("\n");
-
-          content = `${msg.content}\n\n${toolHistoryText}`;
-        }
-
+      // First embed tool history using the shared function
+      const messagesWithHistory = node.embedToolHistory(messages, providerName);
+      
+      // Then convert to Google format
+      return messagesWithHistory.map((msg) => {
         return {
           role: msg.role === "assistant" ? "model" : "user",
-          parts: [{ text: content }],
+          parts: [{ text: msg.content }],
         };
       });
+    };
+
+    // Shared function to extract text from Google response candidate
+    node.extractTextFromCandidate = function (candidate) {
+      if (!candidate || !candidate.content || !candidate.content.parts) {
+        return "";
+      }
+      return candidate.content.parts
+        .filter((part) => part.text)
+        .map((part) => part.text)
+        .join("");
+    };
+
+    // Shared function to extract function calls from Google response candidate
+    node.extractFunctionCallsFromCandidate = function (candidate) {
+      const functionCalls = [];
+      if (candidate && candidate.content && candidate.content.parts) {
+        for (const part of candidate.content.parts) {
+          if (part.functionCall) {
+            functionCalls.push(part.functionCall);
+          }
+        }
+      }
+      return functionCalls;
     };
 
     // Initialize LLM SDK clients
@@ -498,10 +508,7 @@ module.exports = function (RED) {
       // Execute up to configured rounds of tool calls to prevent infinite loops
       const maxRounds = node.toolCallLimit || 10;
 
-      let round = 0;
-      let hitLimit = false;
-
-      for (round = 0; round < maxRounds; round++) {
+      for (let round = 0; round < maxRounds; round++) {
         const requestParams = {
           model: node.model,
           messages: conversationMessages,
@@ -588,16 +595,7 @@ module.exports = function (RED) {
         }
       }
 
-      // Check if we hit the tool call limit for OpenAI
-      if (round >= maxRounds) {
-        hitLimit = true;
-        node.warn(
-          `⚠️ OpenAI: Reached tool call limit (${maxRounds} rounds) - response may be incomplete`
-        );
-        finalContent.push(
-          `⚠️ Reached maximum tool calls (${maxRounds}), response may be incomplete`
-        );
-      }
+      // Note: Tool call limit is automatically enforced by the for loop
 
       // Separate tool calls from final content
       const toolCallsInfo = finalContent
@@ -650,22 +648,8 @@ module.exports = function (RED) {
 
           // Robust text extraction for models that may not set response.text
           let extractedText = response.text || "";
-          try {
-            if (
-              !extractedText &&
-              response.candidates &&
-              response.candidates[0]
-            ) {
-              const candidate = response.candidates[0];
-              if (candidate.content && candidate.content.parts) {
-                extractedText = candidate.content.parts
-                  .filter((part) => part.text)
-                  .map((part) => part.text)
-                  .join("");
-              }
-            }
-          } catch (e) {
-            // Ignore extraction errors and fall back to empty text
+          if (!extractedText && response.candidates && response.candidates[0]) {
+            extractedText = node.extractTextFromCandidate(response.candidates[0]);
           }
 
           return {
@@ -685,14 +669,12 @@ module.exports = function (RED) {
       }));
 
       let lastResponse = null;
+      let hitLimit = false;
 
       // Execute up to configured rounds of tool calls to prevent infinite loops
       const maxRounds = node.toolCallLimit || 10;
 
-      let round = 0;
-      let hitLimit = false;
-
-      for (round = 0; round < maxRounds; round++) {
+      for (let round = 0; round < maxRounds; round++) {
         try {
           // Use the latest Gen AI SDK config format
           const config = {
@@ -717,20 +699,10 @@ module.exports = function (RED) {
           try {
             if (response.functionCalls && response.functionCalls.length > 0) {
               functionCalls = response.functionCalls;
-            } else if (
-              response.candidates &&
-              response.candidates[0] &&
-              response.candidates[0].content
-            ) {
+            } else if (response.candidates && response.candidates[0]) {
               // Check for function calls in the content parts
-              const content = response.candidates[0].content;
-              if (content.parts) {
-                for (const part of content.parts) {
-                  if (part.functionCall) {
-                    functionCalls.push(part.functionCall);
-                  }
-                }
-              }
+              const extractedCalls = node.extractFunctionCallsFromCandidate(response.candidates[0]);
+              functionCalls.push(...extractedCalls);
             }
           } catch (error) {
             functionCalls = [];
@@ -831,22 +803,8 @@ module.exports = function (RED) {
           } else {
             // No tool calls, return final response (robust extraction + fallback)
             let extractedText = response.text || "";
-            try {
-              if (
-                !extractedText &&
-                response.candidates &&
-                response.candidates[0]
-              ) {
-                const candidate = response.candidates[0];
-                if (candidate.content && candidate.content.parts) {
-                  extractedText = candidate.content.parts
-                    .filter((part) => part.text)
-                    .map((part) => part.text)
-                    .join("");
-                }
-              }
-            } catch (e) {
-              // Ignore extraction errors
+            if (!extractedText && response.candidates && response.candidates[0]) {
+              extractedText = node.extractTextFromCandidate(response.candidates[0]);
             }
 
             // Fallback: if still no text, try a non-tool call once (reasoning models can omit text)
@@ -867,18 +825,8 @@ module.exports = function (RED) {
                 );
 
                 let fallbackText = fallback.text || "";
-                if (
-                  !fallbackText &&
-                  fallback.candidates &&
-                  fallback.candidates[0]
-                ) {
-                  const candidate = fallback.candidates[0];
-                  if (candidate.content && candidate.content.parts) {
-                    fallbackText = candidate.content.parts
-                      .filter((part) => part.text)
-                      .map((part) => part.text)
-                      .join("");
-                  }
+                if (!fallbackText && fallback.candidates && fallback.candidates[0]) {
+                  fallbackText = node.extractTextFromCandidate(fallback.candidates[0]);
                 }
                 extractedText = fallbackText;
               } catch (fallbackErr) {
@@ -1192,8 +1140,7 @@ module.exports = function (RED) {
         "Google Stream"
       );
 
-      // Check final context size after truncation
-      const totalMessages = contents.length;
+      // Check final context size after truncation  
       const totalChars = JSON.stringify(contents).length;
 
       if (conversationMessages.length !== truncatedMessages.length) {
@@ -1249,10 +1196,7 @@ module.exports = function (RED) {
 
               // Method 1: Extract from content.parts (Flash and 2.5 Pro with content)
               if (candidate.content && candidate.content.parts) {
-                const textParts = candidate.content.parts
-                  .filter((part) => part.text)
-                  .map((part) => part.text);
-                chunkText = textParts.join("");
+                chunkText = node.extractTextFromCandidate(candidate);
 
                 // Debug: Check if there are thoughtSignature parts too
                 const thoughtParts = candidate.content.parts.filter(
@@ -1296,20 +1240,10 @@ module.exports = function (RED) {
             // Check for function calls
             if (chunk.functionCalls && chunk.functionCalls.length > 0) {
               functionCalls = chunk.functionCalls;
-            } else if (
-              chunk.candidates &&
-              chunk.candidates[0] &&
-              chunk.candidates[0].content
-            ) {
+            } else if (chunk.candidates && chunk.candidates[0]) {
               // Check for function calls in the content parts
-              const content = chunk.candidates[0].content;
-              if (content.parts) {
-                for (const part of content.parts) {
-                  if (part.functionCall) {
-                    functionCalls.push(part.functionCall);
-                  }
-                }
-              }
+              const extractedCalls = node.extractFunctionCallsFromCandidate(chunk.candidates[0]);
+              functionCalls.push(...extractedCalls);
             }
 
             // Check if stream is truly complete
@@ -1321,16 +1255,12 @@ module.exports = function (RED) {
               )
             ) {
               streamComplete = true;
-              const finishReason =
-                chunk.candidates && chunk.candidates[0]
-                  ? chunk.candidates[0].finishReason
-                  : "unknown";
               break;
             }
           }
 
-          // Fallback for reasoning models: if stream ended with no content and no function calls, try non-stream once
-          if (currentText.length === 0 && functionCalls.length === 0) {
+          // Simple fallback: if streaming produced no content, try non-streaming once
+          if (accumulatedContent.length === 0) {
             try {
               const nonStreamResponse =
                 await node.googleClient.models.generateContent({
@@ -1353,13 +1283,7 @@ module.exports = function (RED) {
                 nonStreamResponse.candidates &&
                 nonStreamResponse.candidates[0]
               ) {
-                const candidate = nonStreamResponse.candidates[0];
-                if (candidate.content && candidate.content.parts) {
-                  fallbackText = candidate.content.parts
-                    .filter((part) => part.text)
-                    .map((part) => part.text)
-                    .join("");
-                }
+                fallbackText = node.extractTextFromCandidate(nonStreamResponse.candidates[0]);
               }
 
               // Extract function calls if any
@@ -1369,23 +1293,13 @@ module.exports = function (RED) {
                 nonStreamResponse.functionCalls.length > 0
               ) {
                 fallbackCalls = nonStreamResponse.functionCalls;
-              } else if (
-                nonStreamResponse.candidates &&
-                nonStreamResponse.candidates[0] &&
-                nonStreamResponse.candidates[0].content &&
-                nonStreamResponse.candidates[0].content.parts
-              ) {
-                for (const part of nonStreamResponse.candidates[0].content
-                  .parts) {
-                  if (part.functionCall) {
-                    fallbackCalls.push(part.functionCall);
-                  }
-                }
+              } else if (nonStreamResponse.candidates && nonStreamResponse.candidates[0]) {
+                fallbackCalls = node.extractFunctionCallsFromCandidate(nonStreamResponse.candidates[0]);
               }
 
               if (fallbackText) {
                 currentText = fallbackText;
-                accumulatedContent += fallbackText;
+                accumulatedContent = fallbackText;
                 if (streamCallback) {
                   streamCallback({ type: "content", content: fallbackText });
                 }
@@ -1393,46 +1307,6 @@ module.exports = function (RED) {
 
               if (fallbackCalls.length > 0) {
                 functionCalls = fallbackCalls;
-              }
-            } catch (e) {}
-          }
-
-          // Fallback for Gemini 2.5 Pro: if we got no content, try non-streaming API
-          if (accumulatedContent.length === 0) {
-            try {
-              const nonStreamResponse =
-                await node.googleClient.models.generateContent({
-                  model: node.model,
-                  contents: contents,
-                  config: {
-                    temperature: node.temperature || 0.1,
-                    maxOutputTokens: node.maxTokens || 2000,
-                    systemInstruction: systemInstruction
-                      ? systemInstruction.content
-                      : undefined,
-                  },
-                });
-
-              // Robust extraction from non-stream response
-              let fallbackText = nonStreamResponse.text || "";
-              if (
-                !fallbackText &&
-                nonStreamResponse.candidates &&
-                nonStreamResponse.candidates[0] &&
-                nonStreamResponse.candidates[0].content &&
-                nonStreamResponse.candidates[0].content.parts
-              ) {
-                fallbackText = nonStreamResponse.candidates[0].content.parts
-                  .filter((part) => part.text)
-                  .map((part) => part.text)
-                  .join("");
-              }
-
-              if (fallbackText) {
-                accumulatedContent = fallbackText;
-                if (streamCallback) {
-                  streamCallback({ type: "content", content: fallbackText });
-                }
               }
             } catch (error) {}
           }
@@ -1514,10 +1388,7 @@ module.exports = function (RED) {
               const candidate = chunk.candidates[0];
 
               if (candidate.content && candidate.content.parts) {
-                const textParts = candidate.content.parts
-                  .filter((part) => part.text)
-                  .map((part) => part.text);
-                chunkText = textParts.join("");
+                chunkText = node.extractTextFromCandidate(candidate);
               }
 
               if (!chunkText && chunk.text) {
@@ -1541,17 +1412,9 @@ module.exports = function (RED) {
             // Check for function calls in stream
             if (chunk.functionCalls && chunk.functionCalls.length > 0) {
               streamFunctionCalls = chunk.functionCalls;
-            } else if (
-              chunk.candidates &&
-              chunk.candidates[0] &&
-              chunk.candidates[0].content &&
-              chunk.candidates[0].content.parts
-            ) {
-              for (const part of chunk.candidates[0].content.parts) {
-                if (part.functionCall) {
-                  streamFunctionCalls.push(part.functionCall);
-                }
-              }
+            } else if (chunk.candidates && chunk.candidates[0]) {
+              const extractedCalls = node.extractFunctionCallsFromCandidate(chunk.candidates[0]);
+              streamFunctionCalls.push(...extractedCalls);
             }
 
             // Check if stream is complete
@@ -1919,7 +1782,7 @@ module.exports = function (RED) {
   // API endpoint: send message to copilot
   RED.httpAdmin.post(`${API_PREFIX}/chat`, async function (req, res) {
     try {
-      const { message, nodeId, history } = req.body;
+      const { message, nodeId } = req.body;
 
       // If no nodeId provided, try to find available node
       let node;
@@ -2055,7 +1918,7 @@ module.exports = function (RED) {
   // API endpoint: send message to copilot with streaming
   RED.httpAdmin.post(`${API_PREFIX}/chat-stream`, async function (req, res) {
     try {
-      const { message, nodeId, history } = req.body;
+      const { message, nodeId } = req.body;
 
       // Set headers for Server-Sent Events
       res.writeHead(200, {
@@ -2257,7 +2120,7 @@ module.exports = function (RED) {
   // API endpoint: get context data
   RED.httpAdmin.post(`${API_PREFIX}/context/get`, function (req, res) {
     try {
-      const { key, nodeId } = req.body;
+      const { key } = req.body;
 
       if (!key) {
         return res.status(400).json({
@@ -2303,7 +2166,7 @@ module.exports = function (RED) {
   // API endpoint: set context data
   RED.httpAdmin.post(`${API_PREFIX}/context/set`, function (req, res) {
     try {
-      const { key, data, nodeId } = req.body;
+      const { key, data } = req.body;
 
       if (!key) {
         return res.status(400).json({
@@ -2367,7 +2230,7 @@ module.exports = function (RED) {
   // API endpoint: delete context data
   RED.httpAdmin.post(`${API_PREFIX}/context/delete`, function (req, res) {
     try {
-      const { key, nodeId } = req.body;
+      const { key } = req.body;
 
       if (!key) {
         return res.status(400).json({
