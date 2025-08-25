@@ -1713,7 +1713,7 @@ module.exports = function (RED) {
       // Only clean up history when node is actually removed (not on flow restart)
       if (removed && node.mode === "flow") {
         const historyKey = `dev-copilot-flow-history-${node.id}`;
-        node.context().global.set(historyKey, null);
+        node.context().global.set(historyKey, undefined);
       }
 
       if (done) done();
