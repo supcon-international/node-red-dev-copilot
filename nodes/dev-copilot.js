@@ -36,6 +36,63 @@ module.exports = function (RED) {
     // Get sensitive information (credentials)
     node.apiKey = node.credentials.apiKey || "";
 
+    // Shared function to embed tool history into messages
+    node.embedToolHistory = function (messages, providerName = "LLM") {
+      return messages.map((msg) => {
+        if (msg._toolHistory && msg._toolHistory.length > 0) {
+          const toolsToEmbed = msg._toolHistory;
+          const toolHistoryText = toolsToEmbed
+            .map(
+              (tool) =>
+                `[TOOL_HISTORY] ${tool.name}(${JSON.stringify(tool.args)}) -> ${
+                  typeof tool.result === "string"
+                    ? tool.result
+                    : JSON.stringify(tool.result)
+                }`
+            )
+            .join("\n");
+
+          console.log(
+            `🔍 [Dev-Copilot] Embedding tool history for ${providerName} (full): ${toolsToEmbed.length} tools`
+          );
+
+          return {
+            ...msg,
+            content: `${msg.content}\n\n${toolHistoryText}`,
+          };
+        }
+        return msg;
+      });
+    };
+
+    // Shared function to convert messages to Google format with tool history embedding
+    node.convertToGoogleFormat = function (messages, providerName = "Google") {
+      return messages.map((msg) => {
+        let content = msg.content;
+
+        if (msg._toolHistory && msg._toolHistory.length > 0) {
+          const toolsToEmbed = msg._toolHistory;
+          const toolHistoryText = toolsToEmbed
+            .map(
+              (tool) =>
+                `[TOOL_HISTORY] ${tool.name}(${JSON.stringify(tool.args)}) -> ${
+                  typeof tool.result === "string"
+                    ? tool.result
+                    : JSON.stringify(tool.result)
+                }`
+            )
+            .join("\n");
+
+          content = `${msg.content}\n\n${toolHistoryText}`;
+        }
+
+        return {
+          role: msg.role === "assistant" ? "model" : "user",
+          parts: [{ text: content }],
+        };
+      });
+    };
+
     // Initialize LLM SDK clients
     node.initSDKClients = function () {
       if (!node.apiKey) {
@@ -105,12 +162,72 @@ module.exports = function (RED) {
     };
 
     node.saveHistory = function (history) {
+      // Always truncate history before saving to prevent context length issues
+      const truncatedHistory = node.truncateHistoryIfNeeded(history, 100000);
+
       const key = node.getHistoryKey();
-      node.context().global.set(key, history, function (err) {
+      node.context().global.set(key, truncatedHistory, function (err) {
         if (err) {
           node.warn("Failed to save history: " + err.message);
         }
       });
+    };
+
+    // Truncate conversation history if it gets too long
+    node.truncateHistoryIfNeeded = function (history, maxChars = 100000) {
+      if (!Array.isArray(history) || history.length === 0) {
+        return history;
+      }
+
+      // Calculate current total character count
+      const currentChars = JSON.stringify(history).length;
+
+      if (currentChars <= maxChars) {
+        return history; // No truncation needed
+      }
+
+      console.log(
+        `📏 [Context-Management] History too long (${currentChars} chars), truncating to ~${maxChars} chars`
+      );
+
+      // Always keep the first message if it exists (usually system or initial context)
+      const preservedMessages = history.length > 0 ? [history[0]] : [];
+      let remainingMessages = history.slice(1);
+
+      // Calculate how much we need to remove
+      let currentSize = JSON.stringify(preservedMessages).length;
+      const targetSize = Math.floor(maxChars * 0.8); // Use 80% of max to leave some buffer
+
+      // Remove old messages from the beginning until we're under the target
+      while (remainingMessages.length > 0 && currentSize < targetSize) {
+        const nextMessage = remainingMessages[0];
+        const nextSize = currentSize + JSON.stringify(nextMessage).length;
+
+        if (nextSize > targetSize && remainingMessages.length > 5) {
+          // If adding this message would exceed target and we have >5 messages, stop
+          break;
+        }
+
+        preservedMessages.push(nextMessage);
+        remainingMessages = remainingMessages.slice(1);
+        currentSize = nextSize;
+      }
+
+      // If we still have remaining messages, keep the most recent ones
+      if (remainingMessages.length > 0) {
+        // Keep last 10 messages to maintain recent context
+        const recentMessages = remainingMessages.slice(-10);
+        preservedMessages.push(...recentMessages);
+      }
+
+      const finalSize = JSON.stringify(preservedMessages).length;
+      const removedCount = history.length - preservedMessages.length;
+
+      console.log(
+        `✂️ [Context-Management] Truncated ${removedCount} messages, reduced from ${currentChars} to ${finalSize} chars`
+      );
+
+      return preservedMessages;
     };
 
     // System prompt (default)
@@ -371,9 +488,12 @@ module.exports = function (RED) {
         throw new Error("OpenAI client not initialized");
       }
 
-      let conversationMessages = [...messages];
+      // Embed tool history into message content for LLM visibility (full, no truncation)
+      let conversationMessages = node.embedToolHistory([...messages], "OpenAI");
+
       let finalContent = [];
       let lastResponse = null;
+      let toolHistory = []; // Track tool call history
 
       // Execute up to configured rounds of tool calls to prevent infinite loops
       const maxRounds = node.toolCallLimit || 10;
@@ -411,16 +531,26 @@ module.exports = function (RED) {
             const toolArgs = JSON.parse(toolCall.function.arguments);
 
             finalContent.push(`🔧 Calling tool: ${toolName}`);
-            
+
             // Console output: Tool call
             console.log(`🔧 [Dev-Copilot] Tool Call: ${toolName}`, toolArgs);
 
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
               const formattedResult = node.formatToolResult(toolResult);
-              
+
               // Console output: Tool result (complete)
-              console.log(`✅ [Dev-Copilot] Tool Result: ${toolName}`, formattedResult);
+              console.log(
+                `✅ [Dev-Copilot] Tool Result: ${toolName}`,
+                formattedResult
+              );
+
+              // Add to tool history
+              toolHistory.push({
+                name: toolName,
+                args: toolArgs,
+                result: formattedResult,
+              });
 
               conversationMessages.push({
                 role: "tool",
@@ -429,8 +559,18 @@ module.exports = function (RED) {
               });
             } catch (error) {
               // Console output: Tool error
-              console.log(`❌ [Dev-Copilot] Tool Error: ${toolName}`, error.message);
-              
+              console.log(
+                `❌ [Dev-Copilot] Tool Error: ${toolName}`,
+                error.message
+              );
+
+              // Add error to tool history
+              toolHistory.push({
+                name: toolName,
+                args: toolArgs,
+                result: `Error: ${error.message}`,
+              });
+
               conversationMessages.push({
                 role: "tool",
                 tool_call_id: toolCall.id,
@@ -475,6 +615,7 @@ module.exports = function (RED) {
       return {
         content: displayContent,
         usage: lastResponse ? lastResponse.usage : null,
+        toolHistory: toolHistory, // Include tool history in response
       };
     };
 
@@ -487,12 +628,10 @@ module.exports = function (RED) {
       const systemInstruction = messages.find((m) => m.role === "system");
       let conversationMessages = messages.filter((m) => m.role !== "system");
       let finalContent = [];
+      let toolHistory = []; // Track tool call history
 
-      // Convert messages to Google format
-      const contents = conversationMessages.map((msg) => ({
-        role: msg.role === "assistant" ? "model" : "user",
-        parts: [{ text: msg.content }],
-      }));
+      // Convert messages to Google format (full tool history, no truncation)
+      const contents = node.convertToGoogleFormat(conversationMessages);
 
       // If no tools, use simple call
       if (!tools || tools.length === 0) {
@@ -509,8 +648,28 @@ module.exports = function (RED) {
             },
           });
 
+          // Robust text extraction for models that may not set response.text
+          let extractedText = response.text || "";
+          try {
+            if (
+              !extractedText &&
+              response.candidates &&
+              response.candidates[0]
+            ) {
+              const candidate = response.candidates[0];
+              if (candidate.content && candidate.content.parts) {
+                extractedText = candidate.content.parts
+                  .filter((part) => part.text)
+                  .map((part) => part.text)
+                  .join("");
+              }
+            }
+          } catch (e) {
+            // Ignore extraction errors and fall back to empty text
+          }
+
           return {
-            content: response.text,
+            content: extractedText,
             usage: response.usageMetadata || null,
           };
         } catch (error) {
@@ -606,7 +765,7 @@ module.exports = function (RED) {
                 functionCall.args || functionCall.arguments || {};
 
               finalContent.push(`🔧 Calling tool: ${toolName}`);
-              
+
               // Console output: Tool call (Google)
               console.log(`🔧 [Dev-Copilot] Tool Call: ${toolName}`, toolArgs);
 
@@ -616,9 +775,19 @@ module.exports = function (RED) {
                   toolArgs
                 );
                 const formattedResult = node.formatToolResult(toolResult);
-                
+
                 // Console output: Tool result (Google, complete)
-                console.log(`✅ [Dev-Copilot] Tool Result: ${toolName}`, formattedResult);
+                console.log(
+                  `✅ [Dev-Copilot] Tool Result: ${toolName}`,
+                  formattedResult
+                );
+
+                // Add to tool history
+                toolHistory.push({
+                  name: toolName,
+                  args: toolArgs,
+                  result: formattedResult,
+                });
 
                 functionResponses.push({
                   functionResponse: {
@@ -630,8 +799,18 @@ module.exports = function (RED) {
                 });
               } catch (error) {
                 // Console output: Tool error (Google)
-                console.log(`❌ [Dev-Copilot] Tool Error: ${toolName}`, error.message);
-                
+                console.log(
+                  `❌ [Dev-Copilot] Tool Error: ${toolName}`,
+                  error.message
+                );
+
+                // Add error to tool history
+                toolHistory.push({
+                  name: toolName,
+                  args: toolArgs,
+                  result: `Error: ${error.message}`,
+                });
+
                 functionResponses.push({
                   functionResponse: {
                     name: toolName,
@@ -649,11 +828,67 @@ module.exports = function (RED) {
               role: "user",
               parts: functionResponses,
             });
-
-            continue;
           } else {
-            // No tool calls, return final response
-            finalContent.push(response.text || "No response generated");
+            // No tool calls, return final response (robust extraction + fallback)
+            let extractedText = response.text || "";
+            try {
+              if (
+                !extractedText &&
+                response.candidates &&
+                response.candidates[0]
+              ) {
+                const candidate = response.candidates[0];
+                if (candidate.content && candidate.content.parts) {
+                  extractedText = candidate.content.parts
+                    .filter((part) => part.text)
+                    .map((part) => part.text)
+                    .join("");
+                }
+              }
+            } catch (e) {
+              // Ignore extraction errors
+            }
+
+            // Fallback: if still no text, try a non-tool call once (reasoning models can omit text)
+            if (!extractedText) {
+              try {
+                const fallback = await node.googleClient.models.generateContent(
+                  {
+                    model: node.model,
+                    contents: contents,
+                    config: {
+                      temperature: node.temperature || 0.1,
+                      maxOutputTokens: node.maxTokens || 2000,
+                      systemInstruction: systemInstruction
+                        ? systemInstruction.content
+                        : undefined,
+                    },
+                  }
+                );
+
+                let fallbackText = fallback.text || "";
+                if (
+                  !fallbackText &&
+                  fallback.candidates &&
+                  fallback.candidates[0]
+                ) {
+                  const candidate = fallback.candidates[0];
+                  if (candidate.content && candidate.content.parts) {
+                    fallbackText = candidate.content.parts
+                      .filter((part) => part.text)
+                      .map((part) => part.text)
+                      .join("");
+                  }
+                }
+                extractedText = fallbackText;
+              } catch (fallbackErr) {
+                console.log(
+                  `❌ [Gemini-Debug] Non-stream fallback (no-tools) failed: ${fallbackErr.message}`
+                );
+              }
+            }
+
+            finalContent.push(extractedText || "No response generated");
             break;
           }
         } catch (error) {
@@ -662,7 +897,7 @@ module.exports = function (RED) {
       }
 
       // Check if we hit the tool call limit for Google API
-      if (round >= maxRounds) {
+      if (typeof round === "number" && round >= maxRounds) {
         hitLimit = true;
         node.warn(
           `⚠️ Google: Reached tool call limit (${maxRounds} rounds) - response may be incomplete`
@@ -688,6 +923,7 @@ module.exports = function (RED) {
       return {
         content: displayContent,
         usage: lastResponse ? lastResponse.usageMetadata || null : null,
+        toolHistory: toolHistory, // Include tool history in response
       };
     };
 
@@ -701,10 +937,16 @@ module.exports = function (RED) {
         throw new Error("OpenAI client not initialized");
       }
 
-      let conversationMessages = [...messages];
+      // Embed tool history into message content for LLM visibility (full, no truncation)
+      let conversationMessages = node.embedToolHistory(
+        [...messages],
+        "OpenAI Stream"
+      );
+
       let finalContent = [];
       let lastResponse = null;
       let accumulatedContent = "";
+      let toolHistory = []; // Track tool call history
 
       // Execute up to configured rounds of tool calls to prevent infinite loops
       const maxRounds = node.toolCallLimit || 10;
@@ -799,9 +1041,12 @@ module.exports = function (RED) {
 
             const toolMessage = `🔧 Calling tool: ${toolName}`;
             finalContent.push(toolMessage);
-            
+
             // Console output: Tool call (Stream)
-            console.log(`🔧 [Dev-Copilot] Tool Call (Stream): ${toolName}`, toolArgs);
+            console.log(
+              `🔧 [Dev-Copilot] Tool Call (Stream): ${toolName}`,
+              toolArgs
+            );
 
             if (streamCallback) {
               streamCallback({
@@ -813,9 +1058,19 @@ module.exports = function (RED) {
             try {
               const toolResult = await node.executeMCPTool(toolName, toolArgs);
               const formattedResult = node.formatToolResult(toolResult);
-              
+
               // Console output: Tool result (Stream)
-              console.log(`✅ [Dev-Copilot] Tool Result (Stream): ${toolName}`, formattedResult);
+              console.log(
+                `✅ [Dev-Copilot] Tool Result (Stream): ${toolName}`,
+                formattedResult
+              );
+
+              // Add to tool history
+              toolHistory.push({
+                name: toolName,
+                args: toolArgs,
+                result: formattedResult,
+              });
 
               conversationMessages.push({
                 role: "tool",
@@ -824,10 +1079,20 @@ module.exports = function (RED) {
               });
             } catch (error) {
               // Console output: Tool error (Stream)
-              console.log(`❌ [Dev-Copilot] Tool Error (Stream): ${toolName}`, error.message);
-              
+              console.log(
+                `❌ [Dev-Copilot] Tool Error (Stream): ${toolName}`,
+                error.message
+              );
+
               const errorMessage = `❌ Tool call failed: ${error.message}`;
               finalContent.push(errorMessage);
+
+              // Add error to tool history
+              toolHistory.push({
+                name: toolName,
+                args: toolArgs,
+                result: `Error: ${error.message}`,
+              });
 
               if (streamCallback) {
                 streamCallback({
@@ -875,6 +1140,7 @@ module.exports = function (RED) {
       return {
         content: accumulatedContent,
         usage: lastResponse ? lastResponse.usage : null,
+        toolHistory: toolHistory, // Include tool history in response
       };
     };
 
@@ -888,15 +1154,59 @@ module.exports = function (RED) {
         throw new Error("Google client not initialized");
       }
 
+      // Helper function to check if stream is truly complete
+      const isStreamComplete = (
+        chunk,
+        hasAccumulatedContent,
+        hasFunctionCalls
+      ) => {
+        if (!chunk.candidates || !chunk.candidates[0]) return false;
+
+        const finishReason = chunk.candidates[0].finishReason;
+        const hasFinishReason =
+          finishReason === "STOP" ||
+          finishReason === "MAX_TOKENS" ||
+          finishReason === "SAFETY";
+
+        if (!hasFinishReason) return false;
+
+        // Do not treat thoughts-only (no visible content) as completion. Require content or function calls.
+        return hasFinishReason && (hasAccumulatedContent || hasFunctionCalls);
+      };
+
       const systemInstruction = messages.find((m) => m.role === "system");
       let conversationMessages = messages.filter((m) => m.role !== "system");
       let accumulatedContent = "";
+      let toolHistory = []; // Track tool call history for Google stream
+      let lastResponse = null; // Ensure defined for usage field in returns
 
-      // Convert messages to Google format
-      const contents = conversationMessages.map((msg) => ({
-        role: msg.role === "assistant" ? "model" : "user",
-        parts: [{ text: msg.content }],
-      }));
+      // Truncate conversation history if needed before converting to Google format
+      const truncatedMessages = node.truncateHistoryIfNeeded(
+        conversationMessages,
+        100000
+      );
+
+      // Convert messages to Google format (with truncated history)
+      const contents = node.convertToGoogleFormat(
+        truncatedMessages,
+        "Google Stream"
+      );
+
+      // Check final context size after truncation
+      const totalMessages = contents.length;
+      const totalChars = JSON.stringify(contents).length;
+
+      if (conversationMessages.length !== truncatedMessages.length) {
+        console.log(
+          `✂️ [Context-Management] Context was truncated: ${conversationMessages.length} → ${truncatedMessages.length} messages`
+        );
+      }
+
+      if (totalChars > 100000) {
+        console.log(
+          `⚠️ [Context-Management] Context is still long after truncation (${totalChars} chars)`
+        );
+      }
 
       // If no tools, use simple streaming call
       if (!tools || tools.length === 0) {
@@ -916,82 +1226,69 @@ module.exports = function (RED) {
           const streamingResponse =
             await node.googleClient.models.generateContentStream(request);
 
-          for await (const chunk of streamingResponse) {
-            const text = chunk.text;
-            if (text) {
-              accumulatedContent += text;
+          let finalResponse = null;
+          let currentText = ""; // Initialize missing variable
+          let functionCalls = []; // Initialize missing variable
+          let streamComplete = false; // Initialize missing variable
 
-              if (streamCallback) {
-                streamCallback({
-                  type: "content",
-                  content: text,
-                });
+          for await (const chunk of streamingResponse) {
+            // Keep track of the final chunk for 2.5 Pro fallback
+            if (
+              chunk.candidates &&
+              chunk.candidates[0] &&
+              chunk.candidates[0].finishReason
+            ) {
+              finalResponse = chunk;
+            }
+            // (Debug logging removed for production)
+
+            // 统一内容提取 - 适配所有Gemini模型
+            let chunkText = "";
+            if (chunk.candidates && chunk.candidates[0]) {
+              const candidate = chunk.candidates[0];
+
+              // Method 1: Extract from content.parts (Flash and 2.5 Pro with content)
+              if (candidate.content && candidate.content.parts) {
+                const textParts = candidate.content.parts
+                  .filter((part) => part.text)
+                  .map((part) => part.text);
+                chunkText = textParts.join("");
+
+                // Debug: Check if there are thoughtSignature parts too
+                const thoughtParts = candidate.content.parts.filter(
+                  (part) => part.thoughtSignature
+                );
+                if (thoughtParts.length > 0) {
+                }
+              }
+
+              // Method 2: Check for direct text in chunk (some models)
+              if (!chunkText && chunk.text) {
+                chunkText = chunk.text;
+              }
+
+              // Method 3: Handle 2.5 Pro case - content without parts but with thoughtsTokenCount
+              if (!chunkText && candidate.content && !candidate.content.parts) {
+                if (
+                  chunk.usageMetadata &&
+                  chunk.usageMetadata.thoughtsTokenCount > 0
+                ) {
+                }
+              }
+
+              if (!chunkText) {
               }
             }
-          }
 
-          if (streamCallback) {
-            streamCallback({
-              type: "end",
-            });
-          }
-
-          return {
-            content: accumulatedContent,
-            usage: null,
-          };
-        } catch (error) {
-          throw new Error(`Google API streaming call failed: ${error.message}`);
-        }
-      }
-
-      // Convert tools to Google format (functionDeclarations)
-      const functionDeclarations = tools.map((tool) => ({
-        name: tool.function.name,
-        description: tool.function.description,
-        parameters: tool.function.parameters,
-      }));
-
-      let lastResponse = null;
-
-      // Execute up to configured rounds of tool calls to prevent infinite loops
-      const maxRounds = node.toolCallLimit || 10;
-
-      let round = 0;
-      let hitLimit = false;
-
-      for (round = 0; round < maxRounds; round++) {
-        try {
-          // Use the latest Gen AI SDK config format with streaming
-          const config = {
-            tools: [{ functionDeclarations: functionDeclarations }],
-            temperature: node.temperature || 0.1,
-            maxOutputTokens: node.maxTokens || 2000,
-            systemInstruction: systemInstruction
-              ? systemInstruction.content
-              : undefined,
-          };
-
-          const streamingResponse =
-            await node.googleClient.models.generateContentStream({
-              model: node.model,
-              contents: contents,
-              config: config,
-            });
-
-          let currentText = "";
-          let functionCalls = [];
-
-          for await (const chunk of streamingResponse) {
             // Handle text content
-            if (chunk.text) {
-              currentText += chunk.text;
-              accumulatedContent += chunk.text;
+            if (chunkText) {
+              currentText += chunkText;
+              accumulatedContent += chunkText;
 
               if (streamCallback) {
                 streamCallback({
                   type: "content",
-                  content: chunk.text,
+                  content: chunkText,
                 });
               }
             }
@@ -1014,26 +1311,275 @@ module.exports = function (RED) {
                 }
               }
             }
+
+            // Check if stream is truly complete
+            if (
+              isStreamComplete(
+                chunk,
+                accumulatedContent.length > 0,
+                functionCalls.length > 0
+              )
+            ) {
+              streamComplete = true;
+              const finishReason =
+                chunk.candidates && chunk.candidates[0]
+                  ? chunk.candidates[0].finishReason
+                  : "unknown";
+              break;
+            }
           }
 
-          lastResponse = { usageMetadata: null }; // Placeholder for usage data
+          // Fallback for reasoning models: if stream ended with no content and no function calls, try non-stream once
+          if (currentText.length === 0 && functionCalls.length === 0) {
+            try {
+              const nonStreamResponse =
+                await node.googleClient.models.generateContent({
+                  model: node.model,
+                  contents: contents,
+                  config: {
+                    tools: [{ functionDeclarations: functionDeclarations }],
+                    temperature: node.temperature || 0.1,
+                    maxOutputTokens: node.maxTokens || 2000,
+                    systemInstruction: systemInstruction
+                      ? systemInstruction.content
+                      : undefined,
+                  },
+                });
 
-          if (functionCalls && functionCalls.length > 0) {
-            // Has tool calls
+              // Extract text from non-stream response
+              let fallbackText = nonStreamResponse.text || "";
+              if (
+                !fallbackText &&
+                nonStreamResponse.candidates &&
+                nonStreamResponse.candidates[0]
+              ) {
+                const candidate = nonStreamResponse.candidates[0];
+                if (candidate.content && candidate.content.parts) {
+                  fallbackText = candidate.content.parts
+                    .filter((part) => part.text)
+                    .map((part) => part.text)
+                    .join("");
+                }
+              }
 
-            // Add model response to conversation
+              // Extract function calls if any
+              let fallbackCalls = [];
+              if (
+                nonStreamResponse.functionCalls &&
+                nonStreamResponse.functionCalls.length > 0
+              ) {
+                fallbackCalls = nonStreamResponse.functionCalls;
+              } else if (
+                nonStreamResponse.candidates &&
+                nonStreamResponse.candidates[0] &&
+                nonStreamResponse.candidates[0].content &&
+                nonStreamResponse.candidates[0].content.parts
+              ) {
+                for (const part of nonStreamResponse.candidates[0].content
+                  .parts) {
+                  if (part.functionCall) {
+                    fallbackCalls.push(part.functionCall);
+                  }
+                }
+              }
+
+              if (fallbackText) {
+                currentText = fallbackText;
+                accumulatedContent += fallbackText;
+                if (streamCallback) {
+                  streamCallback({ type: "content", content: fallbackText });
+                }
+              }
+
+              if (fallbackCalls.length > 0) {
+                functionCalls = fallbackCalls;
+              }
+            } catch (e) {}
+          }
+
+          // Fallback for Gemini 2.5 Pro: if we got no content, try non-streaming API
+          if (accumulatedContent.length === 0) {
+            try {
+              const nonStreamResponse =
+                await node.googleClient.models.generateContent({
+                  model: node.model,
+                  contents: contents,
+                  config: {
+                    temperature: node.temperature || 0.1,
+                    maxOutputTokens: node.maxTokens || 2000,
+                    systemInstruction: systemInstruction
+                      ? systemInstruction.content
+                      : undefined,
+                  },
+                });
+
+              // Robust extraction from non-stream response
+              let fallbackText = nonStreamResponse.text || "";
+              if (
+                !fallbackText &&
+                nonStreamResponse.candidates &&
+                nonStreamResponse.candidates[0] &&
+                nonStreamResponse.candidates[0].content &&
+                nonStreamResponse.candidates[0].content.parts
+              ) {
+                fallbackText = nonStreamResponse.candidates[0].content.parts
+                  .filter((part) => part.text)
+                  .map((part) => part.text)
+                  .join("");
+              }
+
+              if (fallbackText) {
+                accumulatedContent = fallbackText;
+                if (streamCallback) {
+                  streamCallback({ type: "content", content: fallbackText });
+                }
+              }
+            } catch (error) {}
+          }
+
+          // Ensure at least some content is emitted before ending
+          if (accumulatedContent.length === 0 && streamCallback) {
+            streamCallback({
+              type: "content",
+              content: "No response generated",
+            });
+          }
+
+          if (streamCallback) {
+            streamCallback({
+              type: "end",
+            });
+          }
+
+          return {
+            content: accumulatedContent,
+            usage: finalResponse ? finalResponse.usageMetadata : null,
+            toolHistory: toolHistory, // Include tool history for Google stream
+          };
+        } catch (error) {
+          throw new Error(`Google API streaming call failed: ${error.message}`);
+        }
+      }
+
+      // Convert tools to Google format (functionDeclarations) for tool-enabled streaming
+      const functionDeclarations = tools.map((tool) => ({
+        name: tool.function.name,
+        description: tool.function.description,
+        parameters: tool.function.parameters,
+      }));
+
+      // Execute up to configured rounds of tool calls to prevent infinite loops
+      const maxRounds = node.toolCallLimit || 10;
+
+      let round = 0;
+      let hitLimit = false;
+
+      for (round = 0; round < maxRounds; round++) {
+        try {
+          // Use the latest Gen AI SDK config format for streaming with tools
+          const config = {
+            tools: [{ functionDeclarations: functionDeclarations }],
+            temperature: node.temperature || 0.1,
+            maxOutputTokens: node.maxTokens || 2000,
+            systemInstruction: systemInstruction
+              ? systemInstruction.content
+              : undefined,
+          };
+
+          const streamingResponse = await node.googleClient.models.generateContentStream({
+            model: node.model,
+            contents: contents,
+            config: config,
+          });
+
+          lastResponse = null;
+          let currentStreamText = "";
+          let streamFunctionCalls = [];
+          let streamComplete = false;
+
+          for await (const chunk of streamingResponse) {
+            // Keep track of the final chunk
+            if (
+              chunk.candidates &&
+              chunk.candidates[0] &&
+              chunk.candidates[0].finishReason
+            ) {
+              lastResponse = chunk;
+            }
+
+            // Extract text content
+            let chunkText = "";
+            if (chunk.candidates && chunk.candidates[0]) {
+              const candidate = chunk.candidates[0];
+
+              if (candidate.content && candidate.content.parts) {
+                const textParts = candidate.content.parts
+                  .filter((part) => part.text)
+                  .map((part) => part.text);
+                chunkText = textParts.join("");
+              }
+
+              if (!chunkText && chunk.text) {
+                chunkText = chunk.text;
+              }
+            }
+
+            // Handle text content
+            if (chunkText) {
+              currentStreamText += chunkText;
+              accumulatedContent += chunkText;
+
+              if (streamCallback) {
+                streamCallback({
+                  type: "content",
+                  content: chunkText,
+                });
+              }
+            }
+
+            // Check for function calls in stream
+            if (chunk.functionCalls && chunk.functionCalls.length > 0) {
+              streamFunctionCalls = chunk.functionCalls;
+            } else if (
+              chunk.candidates &&
+              chunk.candidates[0] &&
+              chunk.candidates[0].content &&
+              chunk.candidates[0].content.parts
+            ) {
+              for (const part of chunk.candidates[0].content.parts) {
+                if (part.functionCall) {
+                  streamFunctionCalls.push(part.functionCall);
+                }
+              }
+            }
+
+            // Check if stream is complete
+            if (
+              isStreamComplete(
+                chunk,
+                currentStreamText.length > 0,
+                streamFunctionCalls.length > 0
+              )
+            ) {
+              streamComplete = true;
+              break;
+            }
+          }
+
+          if (streamFunctionCalls && streamFunctionCalls.length > 0) {
+            // Has tool calls - add model response to conversation
             const modelContent = {
               role: "model",
               parts: [],
             };
 
             // Add text response if available
-            if (currentText) {
-              modelContent.parts.push({ text: currentText });
+            if (currentStreamText) {
+              modelContent.parts.push({ text: currentStreamText });
             }
 
             // Add function calls
-            for (const functionCall of functionCalls) {
+            for (const functionCall of streamFunctionCalls) {
               modelContent.parts.push({ functionCall: functionCall });
             }
 
@@ -1041,13 +1587,12 @@ module.exports = function (RED) {
 
             const functionResponses = [];
 
-            for (const functionCall of functionCalls) {
+            for (const functionCall of streamFunctionCalls) {
               const toolName = functionCall.name;
-              const toolArgs =
-                functionCall.args || functionCall.arguments || {};
+              const toolArgs = functionCall.args || functionCall.arguments || {};
 
               const toolMessage = `🔧 Calling tool: ${toolName}`;
-              
+
               // Console output: Tool call (Google Stream)
               console.log(`🔧 [Dev-Copilot] Tool Call (Google Stream): ${toolName}`, toolArgs);
 
@@ -1059,14 +1604,21 @@ module.exports = function (RED) {
               }
 
               try {
-                const toolResult = await node.executeMCPTool(
-                  toolName,
-                  toolArgs
-                );
+                const toolResult = await node.executeMCPTool(toolName, toolArgs);
                 const formattedResult = node.formatToolResult(toolResult);
-                
+
                 // Console output: Tool result (Google Stream)
-                console.log(`✅ [Dev-Copilot] Tool Result (Google Stream): ${toolName}`, formattedResult);
+                console.log(
+                  `✅ [Dev-Copilot] Tool Result (Google Stream): ${toolName}`,
+                  formattedResult
+                );
+
+                // Add to tool history
+                toolHistory.push({
+                  name: toolName,
+                  args: toolArgs,
+                  result: formattedResult,
+                });
 
                 functionResponses.push({
                   functionResponse: {
@@ -1078,9 +1630,19 @@ module.exports = function (RED) {
                 });
               } catch (error) {
                 // Console output: Tool error (Google Stream)
-                console.log(`❌ [Dev-Copilot] Tool Error (Google Stream): ${toolName}`, error.message);
-                
+                console.log(
+                  `❌ [Dev-Copilot] Tool Error (Google Stream): ${toolName}`,
+                  error.message
+                );
+
                 const errorMessage = `❌ Tool call failed: ${error.message}`;
+
+                // Add error to tool history
+                toolHistory.push({
+                  name: toolName,
+                  args: toolArgs,
+                  result: `Error: ${error.message}`,
+                });
 
                 if (streamCallback) {
                   streamCallback({
@@ -1106,18 +1668,22 @@ module.exports = function (RED) {
               parts: functionResponses,
             });
 
-            continue;
+            continue; // Continue to next round of tool calls
           } else {
-            // No tool calls, return final response
-            break;
+            // No tool calls, check if we have text response
+            if (currentStreamText.length > 0) {
+              break; // We have text response, exit loop
+            }
+            // If no text and no tools, continue waiting for response
+            continue;
           }
         } catch (error) {
-          throw new Error(`Google API streaming call failed: ${error.message}`);
+          throw new Error(`Google API streaming with tools failed: ${error.message}`);
         }
       }
 
       // Check if we hit the tool call limit
-      if (round >= maxRounds) {
+      if (typeof round === "number" && round >= maxRounds) {
         hitLimit = true;
         const limitMessage = `⚠️ Reached maximum tool calls (${maxRounds}), response may be incomplete`;
 
@@ -1136,9 +1702,12 @@ module.exports = function (RED) {
         });
       }
 
+      // Debug summary removed
+
       return {
         content: accumulatedContent,
         usage: lastResponse ? lastResponse.usageMetadata || null : null,
+        toolHistory: toolHistory, // Include tool history for Google stream
       };
     };
 
@@ -1183,7 +1752,7 @@ module.exports = function (RED) {
         if (msg.payload) {
           // Console output: Flow mode input
           console.log("🟦 [Dev-Copilot] Flow Input:", userMessage.content);
-          
+
           // Add user message to conversation history
           conversationHistory.push(userMessage);
         }
@@ -1196,9 +1765,12 @@ module.exports = function (RED) {
         // Call LLM
         console.log("🔄 [Dev-Copilot] Calling LLM (Flow)...");
         const response = await node.callLLM(messages);
-        
+
         // Console output: Flow response
-        console.log("🟩 [Dev-Copilot] Flow Response:", response.content || "No content");
+        console.log(
+          "🟩 [Dev-Copilot] Flow Response:",
+          response.content || "No content"
+        );
 
         // Add assistant response to conversation history and save it
         if (response && response.content) {
@@ -1206,6 +1778,12 @@ module.exports = function (RED) {
             role: "assistant",
             content: response.content,
           };
+
+          // Add tool history if available
+          if (response.toolHistory && response.toolHistory.length > 0) {
+            assistantMessage._toolHistory = response.toolHistory;
+          }
+
           conversationHistory.push(assistantMessage);
 
           // Save updated conversation history to Flow node's independent storage
@@ -1422,9 +2000,12 @@ module.exports = function (RED) {
       // Call LLM
       console.log("🔄 [Dev-Copilot] Calling LLM...");
       const response = await node.callLLM(messages);
-      
+
       // Console output: LLM response
-      console.log("🟩 [Dev-Copilot] LLM Response:", response.content || "No content");
+      console.log(
+        "🟩 [Dev-Copilot] LLM Response:",
+        response.content || "No content"
+      );
 
       // Add both user and assistant messages to service history
       serviceHistory.push(userMessage);
@@ -1433,6 +2014,12 @@ module.exports = function (RED) {
           role: "assistant",
           content: response.content,
         };
+
+        // Add tool history if available
+        if (response.toolHistory && response.toolHistory.length > 0) {
+          assistantMessage._toolHistory = response.toolHistory;
+        }
+
         serviceHistory.push(assistantMessage);
       }
 
@@ -1555,20 +2142,29 @@ module.exports = function (RED) {
 
       // Store the complete response for history
       let completeResponse = "";
+      let streamToolHistory = [];
 
       // Console output: Starting stream
       console.log("🔄 [Dev-Copilot] Calling LLM (Stream)...");
 
       // Call LLM with streaming
-      await node.callLLMStream(messages, (chunk) => {
+      const streamResult = await node.callLLMStream(messages, (chunk) => {
         if (chunk.type === "content" && chunk.content) {
           completeResponse += chunk.content;
         }
         sendSSE(chunk);
       });
 
+      // Get tool history from stream result
+      if (streamResult && streamResult.toolHistory) {
+        streamToolHistory = streamResult.toolHistory;
+      }
+
       // Console output: Stream response completed
-      console.log("🟩 [Dev-Copilot] Stream Response Completed:", completeResponse);
+      console.log(
+        "🟩 [Dev-Copilot] Stream Response Completed:",
+        completeResponse
+      );
 
       // Add user and assistant messages to service history and save
       serviceHistory.push(userMessage);
@@ -1577,6 +2173,12 @@ module.exports = function (RED) {
           role: "assistant",
           content: completeResponse,
         };
+
+        // Add tool history if available
+        if (streamToolHistory.length > 0) {
+          assistantMessage._toolHistory = streamToolHistory;
+        }
+
         serviceHistory.push(assistantMessage);
         node.saveHistory(serviceHistory);
       }
